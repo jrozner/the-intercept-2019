@@ -27,5 +27,5 @@ func main() {
 
 	router.Mount("/", handlers.Mux)
 
-	http.ListenAndServe(":8080", router)
+	log.Fatal(http.ListenAndServe(":8080", router))
 }
