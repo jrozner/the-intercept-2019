@@ -331,7 +331,7 @@ U 1 1 5CC3BBC1
 P 1750 5900
 F 0 "SW1" H 1750 6185 50  0000 C CNN
 F 1 "SW_Push" H 1750 6094 50  0000 C CNN
-F 2 "the-intercept:D3SH" H 1750 6100 50  0001 C CNN
+F 2 "the-intercept:D3SH-A0R" H 1750 6100 50  0001 C CNN
 F 3 "~" H 1750 6100 50  0001 C CNN
 	1    1750 5900
 	1    0    0    -1  
@@ -342,7 +342,7 @@ U 1 1 5CC3C862
 P 2850 5900
 F 0 "SW2" H 2850 6185 50  0000 C CNN
 F 1 "SW_Push" H 2850 6094 50  0000 C CNN
-F 2 "the-intercept:D3SH" H 2850 6100 50  0001 C CNN
+F 2 "the-intercept:D3SH-A0L" H 2850 6100 50  0001 C CNN
 F 3 "~" H 2850 6100 50  0001 C CNN
 	1    2850 5900
 	1    0    0    -1  
@@ -770,8 +770,6 @@ Text GLabel 8050 4350 0    50   Output ~ 0
 CS
 Text GLabel 8050 4550 0    50   BiDi ~ 0
 DATA
-Text GLabel 4850 5150 0    50   Input ~ 0
-CS
 Text GLabel 5950 5150 2    50   Input ~ 0
 CLK
 $Comp
@@ -1280,4 +1278,6 @@ Wire Wire Line
 Connection ~ 7700 5150
 Wire Wire Line
 	6850 4750 8150 4750
+Text GLabel 4850 5150 0    50   Input ~ 0
+CS
 $EndSCHEMATC
