@@ -4,6 +4,7 @@ create table users (
     last_name varchar(254) not null,
     access_key varchar(254) unique not null,
     secret_key varchar(254) not null,
+    serial varchar(254) unique not null,
     created_at datetime not null,
     updated_at datetime not null,
     deleted_at datetime,
