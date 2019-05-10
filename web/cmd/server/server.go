@@ -8,7 +8,9 @@ import (
 	"github.com/go-chi/chi/middleware"
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/mysql"
+
 	"github.com/jrozner/the-intercept-2019/web/handlers"
+	mw "github.com/jrozner/the-intercept-2019/web/middleware"
 )
 
 func main() {
@@ -23,9 +25,11 @@ func main() {
 	router.Use(middleware.RequestID)
 	router.Use(middleware.Recoverer)
 	router.Use(middleware.WithValue("db", db))
-	router.Use(middleware.WithValue("user", uint64(1)))
 
-	router.Mount("/", handlers.Mux)
+	authenticated := chi.NewMux()
+	authenticated.Use(mw.Authenticate(db))
+	handlers.RegisterAuthenticated(authenticated)
+	router.Mount("/", authenticated)
 
 	log.Fatal(http.ListenAndServe(":8080", router))
 }
