@@ -41,7 +41,7 @@ func (a *authenticate) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	)
 	authorizationHeader := r.Header.Get("Authorization")
 	if authorizationHeader == "" {
-		log.Println("missing authorization header")
+		log.Println("authentication: missing authorization header")
 		goto authfail
 	}
 
@@ -50,7 +50,7 @@ func (a *authenticate) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	for _, part := range headerParts {
 		kv := strings.Split(part, "=")
 		if len(kv) != 2 {
-			log.Println("malformed authorization header")
+			log.Println("authentication: malformed authorization header")
 			continue
 		}
 
@@ -59,7 +59,7 @@ func (a *authenticate) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	accessKey, ok = authorizationParts["Access-Key"]
 	if !ok {
-		log.Println("missing access key")
+		log.Println("authentication: missing access key")
 		goto authfail
 	}
 
@@ -74,7 +74,7 @@ func (a *authenticate) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	expectedSignature, ok = authorizationParts["Signature"]
 	if !ok {
-		log.Println("missing signature")
+		log.Println("authentication: missing signature")
 		goto authfail
 	}
 
