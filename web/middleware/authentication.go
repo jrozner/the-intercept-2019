@@ -96,7 +96,10 @@ func (a *authenticate) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	b, ok = r.Body.(io.Seeker)
 	if ok {
-		b.Seek(0, 0)
+		_, err = b.Seek(0, 0)
+		if err != nil {
+			log.Println("authentication: unable to seek body back to beginning")
+		}
 	} else {
 		log.Println("authentication: body is not a Seeker")
 	}
