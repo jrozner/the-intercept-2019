@@ -26,6 +26,7 @@ func (a *authenticate) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var (
 		accessKey                string
 		authorizationParts       = make(map[string]string)
+		b                        io.Seeker
 		computedSignature        []byte
 		ctx                      context.Context
 		err                      error
@@ -92,6 +93,13 @@ func (a *authenticate) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	computedSignature = mac.Sum(nil)
+
+	b, ok = r.Body.(io.Seeker)
+	if ok {
+		b.Seek(0, 0)
+	} else {
+		log.Println("authentication: body is not a Seeker")
+	}
 
 	expectedSignatureDecoded, err = hex.DecodeString(expectedSignature)
 	if err != nil {
