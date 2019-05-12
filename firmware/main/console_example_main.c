@@ -1,3 +1,13 @@
+/*
+ * The Intercept - LayerOne 2019
+ * Hardware CTF
+ *
+ * Coded (poorly) by datagram & Joe Rozner
+ *
+ * Many lines of code re-used from various esp-idf component/example files.
+ * Base code based on the esp-idf/examples/console
+ */
+
 #include <stdio.h>
 #include <string.h>
 //#include "esp_system.h"
@@ -23,11 +33,13 @@
 #include "cmd_wifi.c"
 
 #define PROD false
-// sensor pins
-#define SENSOR_PHOTO 33 //9
-#define SENSOR_SW1 4 //6
-#define SENSOR_SW2 34 //26
 
+// sensor pins
+//#define SENSOR_PHOTO 33 //9 //moved to direct ADC1_CHANNEL_5 below
+#define SENSOR_SW1 4 //GPIO 4 - phys 6
+#define SENSOR_SW2 34 //GPIO 34 - phys 26
+
+// Logging tag for ESP
 static const char* TAG = "intercept";
 
 /* Console command history can be stored to and loaded from a file.
@@ -39,8 +51,7 @@ static const char* TAG = "intercept";
 #define MOUNT_PATH "/data"
 #define HISTORY_PATH MOUNT_PATH "/history.txt"
 
-static void initialize_filesystem()
-{
+static void initialize_filesystem() {
     static wl_handle_t wl_handle;
     const esp_vfs_fat_mount_config_t mount_config = {
             .max_files = 4,
@@ -54,8 +65,7 @@ static void initialize_filesystem()
 }
 #endif // CONFIG_STORE_HISTORY
 
-static void initialize_nvs()
-{
+static void initialize_nvs() {
     esp_err_t err = nvs_flash_init();
     if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
         ESP_ERROR_CHECK( nvs_flash_erase() );
@@ -64,8 +74,7 @@ static void initialize_nvs()
     ESP_ERROR_CHECK(err);
 }
 
-static void initialize_console()
-{
+static void initialize_console() {
     /* Disable buffering on stdin and stdout */
     setvbuf(stdin, NULL, _IONBF, 0);
     setvbuf(stdout, NULL, _IONBF, 0);
@@ -111,23 +120,22 @@ static void initialize_console()
 #endif*/
 }
 
+// Tamper sensor ISR notification queue
 static xQueueHandle gpio_evt_queue = NULL;
-
-portMUX_TYPE myMutex = portMUX_INITIALIZER_UNLOCKED;
 
 static void IRAM_ATTR gpio_isr_handler_sw1(void* arg);
 static void IRAM_ATTR gpio_isr_handler_sw2(void* arg);
 static void sensor_handler_digi(void *arg);
 static void sensor_handler_ana(void *arg);
 
-static void IRAM_ATTR gpio_isr_handler_sw1(void* arg)
-{
+// switch 1 (lever) ISR
+static void IRAM_ATTR gpio_isr_handler_sw1(void* arg) {
     uint32_t gpio_num = (uint32_t) arg;
     xQueueSendFromISR(gpio_evt_queue, &gpio_num, NULL);
 }
 
-static void IRAM_ATTR gpio_isr_handler_sw2(void* arg)
-{
+// switch 2 (lever) ISR
+static void IRAM_ATTR gpio_isr_handler_sw2(void* arg) {
     uint32_t gpio_num = (uint32_t) arg;
     xQueueSendFromISR(gpio_evt_queue, &gpio_num, NULL);
 }
@@ -135,11 +143,20 @@ static void IRAM_ATTR gpio_isr_handler_sw2(void* arg)
 // debounce vars for digital switches
 bool old_state_sw1=0, old_state_sw2=0;
 
+// Task handling digital sensor notifications from ISRs
 static void sensor_handler_digi(void *arg) {
     uint32_t io_num;
     bool state=0;
     for (;;) {
+        // check queue for events from ISR
         if (xQueueReceive(gpio_evt_queue, &io_num, portMAX_DELAY)) {
+            /* workflow:
+             * - grab switch state
+             * - verify state is high
+             * -- really awful debounce check
+             * --- tamper alert
+             * - save current state for debounce checking
+             */
             state = gpio_get_level(io_num);
             switch(io_num) {
                 case SENSOR_SW1:
@@ -154,25 +171,22 @@ static void sensor_handler_digi(void *arg) {
                     }
                     old_state_sw2 = state;
                     break;
-               //default:
-               //     break;
             }
-            /*if (state != old_state_sw1) {
-                //printf("TAMPERING DETECTED? sw %d\n", io_num);
-                printf("TAMPERING DETECTED? sw\n");
-            }*/
-
         }
     }
 }
 
+// Task handling analog sensor
+// Can't ISR this? Instead does polling via task delay and analog reads
 static void sensor_handler_ana(void *arg) {
     const TickType_t delay_ms = 50/portTICK_PERIOD_MS;
 
+    adc1_config_width(ADC_WIDTH_BIT_12);
+    adc1_config_channel_atten(ADC1_CHANNEL_5,ADC_ATTEN_DB_0);
     for( ;; )
     {
-        adc1_config_width(ADC_WIDTH_BIT_12);
-        adc1_config_channel_atten(ADC1_CHANNEL_5,ADC_ATTEN_DB_0);
+        //adc1_config_width(ADC_WIDTH_BIT_12);
+        //adc1_config_channel_atten(ADC1_CHANNEL_5,ADC_ATTEN_DB_0);
         int val = adc1_get_raw(ADC1_CHANNEL_5);
         if (val > 0) { 
             printf("TAMPERING DETECTED\t%d\n", val);
@@ -182,51 +196,65 @@ static void sensor_handler_ana(void *arg) {
     }
 }
 
-void app_main()
-{
+void app_main() {
+    // PRAISE THE TUNA
+    const char* tunalogo = "\n"
+    "                          7777\n"
+    "                         77=+~7\n"
+    "                        7+77?77\n"
+    "                      7.I==?I777         77=+77                        7 77\n"
+    "                     77+~~?+=??+~77    7=+7?777                       7~:77\n"
+    "              7 777+.=~,,..........,.:7=.~+I77                       77?=7\n"
+    "          7777.?::.....,,.,.................~,7777 7               77I=+7\n"
+    "         7:,,,,,,..,??????I+????,,,,,,,......,:.7+77              7+=7.7\n"
+    "\x1b[1;93m+----=+--------+\x1b[0m?+??7?+I??II??II??I??I??I?+,:,,:,,.,~,7777        7=~==7\n"
+    "\x1b[1;93m|   /\x1b[0m,\x1b[1;93m|        |\x1b[0mII=IIII=::?~+7+7+I???+II???I??+I?++?~,,,:+:7777777:~=I7\n"
+    " \x1b[1;93m\\ /\x1b[0m=:?\x1b[1;93m\\       /\x1b[0m77?=?I7I?I?II7IIII?IIII7IIIIII?I???????+++++?+:.,+:II=7\n"
+    "  \x1b[1;93mV\x1b[0m777+I\x1b[1;93m\\_____/\x1b[0m77?II77??I?+IIIIII7III7II77I7IIIII7IIII7?I???+=???++=7\n"
+    " 77=+II7,777II?+III+I7I???7III77777I777777I7IIIIII?I+=?+I+7~77777=?I7~7\n"
+    "   -_    /+??++=II=I?IIIIIII77II7IIIII7II7II????++???,~777      77~=I=77\n"
+    "     7777I+??+~=?+=?I?I??I?IIIIII?I??III?++?==??I++7  77         7 =??+7\n"
+    "         77.?=:=???++=+?++?+?+++??I????+=+=+?I=I 77               77+I?7\n"
+    "            7777777:77IIII???????III77III~,??I?777                 77=?.7\n"
+    "                    77,~.I~=7777777777777777777I77                  77?~7\n"
+    "                     777:~=77               777,=77                  77:,7\n"
+    "                        I7=77                  7777                    777\n"
+    "                        777+7\n"
+    "                           777\n\n";
 
-const char* tunalogo = "\n"
-"                          7777\n"
-"                         77=+~7\n"
-"                        7+77?77\n"
-"                      7.I==?I777         77=+77                        7 77\n"
-"                     77+~~?+=??+~77    7=+7?777                       7~:77\n"
-"              7 777+.=~,,..........,.:7=.~+I77                       77?=7\n"
-"          7777.?::.....,,.,.................~,7777 7               77I=+7\n"
-"         7:,,,,,,..,??????I+????,,,,,,,......,:.7+77              7+=7.7\n"
-"\x1b[1;93m+----=+--------+\x1b[0m?+??7?+I??II??II??I??I??I?+,:,,:,,.,~,7777        7=~==7\n"
-"\x1b[1;93m|   /\x1b[0m,\x1b[1;93m|        |\x1b[0mII=IIII=::?~+7+7+I???+II???I??+I?++?~,,,:+:7777777:~=I7\n"
-" \x1b[1;93m\\ /\x1b[0m=:?\x1b[1;93m\\       /\x1b[0m77?=?I7I?I?II7IIII?IIII7IIIIII?I???????+++++?+:.,+:II=7\n"
-"  \x1b[1;93mV\x1b[0m777+I\x1b[1;93m\\_____/\x1b[0m77?II77??I?+IIIIII7III7II77I7IIIII7IIII7?I???+=???++=7\n"
-" 77=+II7,777II?+III+I7I???7III77777I777777I7IIIIII?I+=?+I+7~77777=?I7~7\n"
-"   -_    /+??++=II=I?IIIIIII77II7IIIII7II7II????++???,~777      77~=I=77\n"
-"     7777I+??+~=?+=?I?I??I?IIIIII?I??III?++?==??I++7  77         7 =??+7\n"
-"         77.?=:=???++=+?++?+?+++??I????+=+=+?I=I 77               77+I?7\n"
-"            7777777:77IIII???????III77III~,??I?777                 77=?.7\n"
-"                    77,~.I~=7777777777777777777I77                  77?~7\n"
-"                     777:~=77               777,=77                  77:,7\n"
-"                        I7=77                  7777                    777\n"
-"                        777+7\n"
-"                           777\n\n";
+
+    // Reset logging for prod post-boot
+    // Allow seeing the boot informational messages about memory setup/entry point/etc
+    // Disable errors with
+    #if PROD
+        esp_log_level_set("*", ESP_LOG_ERROR); 
+    #else // logging enabled (debug build only)
+        ESP_LOGI(TAG, "Entering app_main - logging still enabled!\n");
+    #endif
+
+    // init system components for console
     initialize_nvs();
-#if CONFIG_STORE_HISTORY
-    initialize_filesystem();
-#endif
+    #if CONFIG_STORE_HISTORY
+      initialize_filesystem();
+    #endif
     initialize_console();
 
-    /* Register commands */
-    esp_console_register_help_command(); // register master 'help' command
-    register_system(); // register main command handlers
-    //register_wifi(); // register wifi command handlers TODO not in prod
+    // register console command handlers
+    esp_console_register_help_command();
+    register_system();
+    #if !PROD
+        register_wifi(); // register wifi command handlers (debug build only)
+    #endif
 
     // TODO prod values
-    // join game WIFI network
-    //wifi_join("NSL","1qaz2wsx3edc", 10);
+    // Join game WIFI network
+    if (wifi_join("NSL","1qaz2wsx3edc", 10)) {
+            printf("Can't connect to game network - please return to the HHV and restart me!\n");
+
+    }
 
     /////////////////////////////////////////////////
-    // Tamper setupio_conf.pin_bit_mask
-
-
+    // Tamper sensor pin setup
     gpio_config_t io_conf;
     io_conf.intr_type = GPIO_PIN_INTR_POSEDGE;
     io_conf.mode = GPIO_MODE_INPUT;
@@ -234,10 +262,6 @@ const char* tunalogo = "\n"
     io_conf.pull_down_en = 0;
     io_conf.pull_up_en = 0;
     gpio_config(&io_conf);
-
-    //change gpio intrrupt type for one pin
-    //gpio_set_intr_type(SENSOR_SW1, GPIO_INTR_POSEDGE);
-    //gpio_set_intr_type(SENSOR_SW2, GPIO_INTR_HIGH_LEVEL);
 
     gpio_evt_queue = xQueueCreate(10, sizeof(uint32_t));
 
@@ -255,21 +279,23 @@ const char* tunalogo = "\n"
 
     /////////////////////////////////////////////////
     //	Console setup
-    const char* prompt = LOG_COLOR_I "cooltuna> " LOG_RESET_COLOR; // TODO prompt device name/info ?
+    const char* prompt = LOG_COLOR_I "cooltuna> " LOG_RESET_COLOR;
     int probe_status = linenoiseProbe();
     if (probe_status) { 
         printf("\n [!] Your terminal application does not support escape sequences.\n"
                "[!] Line editing and history features are disabled.\n"
                "[!] On Windows, try using Putty instead.\n");
         linenoiseSetDumbMode(1);
-#if CONFIG_LOG_COLORS
-        prompt = "cooltuna> ";
-#endif
+        #if CONFIG_LOG_COLORS
+          prompt = "cooltuna> ";
+        #endif
     }
     printf(tunalogo);
     printf("+ Welcome to COOLTUNA Messaging Service +\n");
 
-    /* Main console loop */
+    /////////////////////////////////////////////////
+    /////////////////////////////////////////////////
+    // MAIN CONSOLE LOOP	
     while(true) {
         char* line = linenoise(prompt);
         printf("TIME\t%d\n", xTaskGetTickCount());
@@ -278,10 +304,6 @@ const char* tunalogo = "\n"
             continue;
         }
         linenoiseHistoryAdd(line); //Add the command to the history
-/*#if CONFIG_STORE_HISTORY
-        // Save command history to filesystem
-        linenoiseHistorySave(HISTORY_PATH);
-#endif*/
 
         // Try to run the command
         int ret;
@@ -295,7 +317,6 @@ const char* tunalogo = "\n"
         } else if (err != ESP_OK) { // TODO remove me?
             printf("Internal error: %s\n", esp_err_to_name(err));
         }
-        /* linenoise allocates line buffer on the heap, so need to free it */
         linenoiseFree(line);
     }
 }

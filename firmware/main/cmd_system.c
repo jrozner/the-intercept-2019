@@ -18,10 +18,6 @@
 
 static const char* TAG = "cmd_system";
 
-#ifdef CONFIG_FREERTOS_USE_STATS_FORMATTING_FUNCTIONS
-#define WITH_TASKS_INFO 1
-#endif
-
 // command console registration functions
 static void register_key_reset();
 static void register_submit_flag();
@@ -38,6 +34,35 @@ static int get_contacts();
 static int crypto_test();
 static int restart(int argc, char** argv);
 
+// HTTP request event handler
+esp_err_t _http_event_handle(esp_http_client_event_t *evt) {
+    switch(evt->event_id) {
+        case HTTP_EVENT_ERROR:
+            break;
+        case HTTP_EVENT_ON_CONNECTED:
+            break;
+        case HTTP_EVENT_HEADER_SENT:
+            break;
+        case HTTP_EVENT_ON_HEADER:
+            printf("%.*s", evt->data_len, (char*)evt->data);
+            break;
+        case HTTP_EVENT_ON_DATA:
+            if (!esp_http_client_is_chunked_response(evt->client)) {
+                printf("%.*s", evt->data_len, (char*)evt->data);
+            }
+
+            break;
+        case HTTP_EVENT_ON_FINISH:
+            break;
+        case HTTP_EVENT_DISCONNECTED:
+            break;
+	    default:
+	        break;
+    }
+    return ESP_OK;
+}
+
+// Register all command handlers (besides wifi)
 void register_system()
 {
 	register_key_reset();
@@ -49,6 +74,9 @@ void register_system()
 	register_restart();
 }
 
+
+///////////////////////////////////////////
+// Example AES256 encryption
 static void register_crypto_test()
 {
         esp_console_cmd_t cmd = {
@@ -63,8 +91,7 @@ static void register_crypto_test()
 char plaintext[8192];
 char encrypted[8192];
 
-static int crypto_test()
-{
+static int crypto_test() {
 	uint8_t key[32];
 	uint8_t iv[16];
 	memset(iv, 0, sizeof(iv));
@@ -104,17 +131,15 @@ static int crypto_test()
 	{
 		//printf( "%02x[%c]%c", plaintext[i],  (plaintext[i]>31)?plaintext[i]:' ', ((i&0xf)!=0xf)?' ':'\n' );
 		printf( "%02x", plaintext[i]);
+        // has the issue with crashing/halting the board like the other printf bullshit
 	}
 	printf( "\n" );
 
-
-esp_aes_free( &ctx );
-	
+    esp_aes_free( &ctx );	
 	return 0;
 }
 
-static void register_key_reset()
-{
+static void register_key_reset() {
 	// key reset
 	esp_console_cmd_t cmd = {
 	    .command = "key_reset",
@@ -125,8 +150,16 @@ static void register_key_reset()
 	ESP_ERROR_CHECK( esp_console_cmd_register(&cmd) );
 }
 
-// Webserver SSL Key
-// static char key[]=""; // hmac encryption key
+//////////////////////////////////////////////////
+// Encryption Things
+
+// static char server_psk[] = ""; // server PSK
+//
+// static char team_secret[] = "AAAAAAAAAAAAAAAAAAA"; // team "secret ID"
+
+// static char hmac_key1[]=""; // general hmac encryption key
+// static char hmac_key2[]=""; // key_reset hmac encryption key
+
 static int key_reset()
 {
 	printf("Initiating key reset with game server . . .\n");
@@ -208,37 +241,6 @@ static void register_get_contacts()
 	ESP_ERROR_CHECK( esp_console_cmd_register(&cmd) );
 }
 
-
-    esp_err_t _http_event_handle(esp_http_client_event_t *evt)
-    {
-    switch(evt->event_id) {
-//        case HTTP_EVENT_ERROR:
-//            break;
-//        case HTTP_EVENT_ON_CONNECTED:
-//            break;
-//        case HTTP_EVENT_HEADER_SENT:
-//            break;
-        case HTTP_EVENT_ON_HEADER:
-            printf("%.*s", evt->data_len, (char*)evt->data);
-            break;
-        case HTTP_EVENT_ON_DATA:
-            if (!esp_http_client_is_chunked_response(evt->client)) {
-                printf("%.*s", evt->data_len, (char*)evt->data);
-            }
-
-            break;
-//        case HTTP_EVENT_ON_FINISH:
-//            break;
-//        case HTTP_EVENT_DISCONNECTED:
-//            break;
-	default:
-	    break;
-    }
-
-    return ESP_OK;
-
-    }
-
 static int get_contacts()
 {
 
@@ -247,7 +249,7 @@ static int get_contacts()
 	   .event_handler = _http_event_handle,
 	};
 	esp_http_client_handle_t client = esp_http_client_init(&config);	
-	//esp_err_t set_header = esp_http_client_set_header(client, "x-verification", "0") // TODO
+	//esp_err_t set_header = esp_http_client_set_header(client, "x-verification", "0") // TODO HMAC header
 	esp_err_t err = esp_http_client_perform(client);
 
 	if (err != ESP_OK) {
@@ -274,18 +276,14 @@ static int get_contacts()
 
 */
 
-
-
 // 'restart' command restarts the program
 
-static int restart(int argc, char** argv)
-{
+static int restart(int argc, char** argv) {
     ESP_LOGI(__func__, "Restarting");
     esp_restart();
 }
 
-static void register_restart()
-{
+static void register_restart() {
     const esp_console_cmd_t cmd = {
         .command = "restart",
         .help = "Restart the program",
@@ -443,7 +441,7 @@ Changed.
 Configuring flash size...
 Auto-detected Flash size: 4MB
 Flash params set to 0x0220
-Compressed 15712 bytes to 9345...
+Compressed 15712 bytesset shiftwidth=4 to 9345...
 )",
 R"(Wrote 15712 bytes (9345 compressed) at 0x00001000 in 0.1 seconds (effective 1126.9 kbit/s)...
 Hash of data verified.
