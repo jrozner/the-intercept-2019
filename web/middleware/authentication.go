@@ -22,7 +22,7 @@ type authenticate struct {
 }
 
 func (a *authenticate) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	//Authorization: Access-Key=...;Signature=asdfasd
+	//Authorization: AccessKey=...;Signature=asdfasd
 	var (
 		accessKey                string
 		authorizationParts       = make(map[string]string)
@@ -57,7 +57,7 @@ func (a *authenticate) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		authorizationParts[kv[0]] = kv[1]
 	}
 
-	accessKey, ok = authorizationParts["Access-Key"]
+	accessKey, ok = authorizationParts["AccessKey"]
 	if !ok {
 		log.Println("authentication: missing access key")
 		goto authfail
