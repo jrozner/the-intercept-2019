@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"log"
@@ -23,18 +24,6 @@ func Register(w http.ResponseWriter, r *http.Request) {
 		log.Panic("unable to retrieve database")
 	}
 
-	accessKey := make([]byte, 64)
-	_, err := rand.Read(accessKey)
-	if err != nil {
-		log.Panic(err)
-	}
-
-	secretKey := make([]byte, 64)
-	_, err = rand.Read(secretKey)
-	if err != nil {
-		log.Panic(err)
-	}
-
 	teamName := r.FormValue("team_name")
 	if teamName == "" {
 		w.WriteHeader(http.StatusBadRequest)
@@ -47,11 +36,21 @@ func Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	accessKey, err := generateKey(sha256.BlockSize)
+	if err != nil {
+		log.Panic(err)
+	}
+
+	secretKey, err := generateKey(sha256.BlockSize)
+	if err != nil {
+		log.Panic(err)
+	}
+
 	user := model.User{
 		TeamName:  teamName,
 		Serial:    serial,
-		AccessKey: hex.EncodeToString(accessKey),
-		SecretKey: hex.EncodeToString(secretKey),
+		AccessKey: accessKey,
+		SecretKey: secretKey,
 	}
 
 	err = db.Save(&user).Error
@@ -65,8 +64,54 @@ func Register(w http.ResponseWriter, r *http.Request) {
 		SecretKey: user.SecretKey,
 	}
 
+	w.Header().Add("Content-Type", "application/json")
 	err = json.NewEncoder(w).Encode(keys)
 	if err != nil {
 		log.Panic(err)
 	}
+}
+
+func rotateSecret(w http.ResponseWriter, r *http.Request) {
+	db, ok := r.Context().Value("db").(*gorm.DB)
+	if !ok {
+		log.Panic("unable to retrieve database")
+	}
+
+	user, ok := r.Context().Value("user").(model.User)
+	if !ok {
+		log.Panic("unable to retrieve database")
+	}
+
+	secret, err := generateKey(sha256.BlockSize)
+	if err != nil {
+		log.Panic(err)
+	}
+
+	user.SecretKey = secret
+
+	err = db.Save(&user).Error
+	if err != nil {
+		log.Panic(err)
+	}
+
+	keys := &keys{
+		AccessKey: user.AccessKey,
+		SecretKey: user.SecretKey,
+	}
+
+	w.Header().Add("Content-Type", "application/json")
+	err = json.NewEncoder(w).Encode(keys)
+	if err != nil {
+		log.Panic(err)
+	}
+}
+
+func generateKey(size uint) (string, error) {
+	key := make([]byte, size)
+	_, err := rand.Read(key)
+	if err != nil {
+		return "", err
+	}
+
+	return hex.EncodeToString(key), nil
 }

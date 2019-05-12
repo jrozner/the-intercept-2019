@@ -8,8 +8,8 @@ import (
 	"strconv"
 
 	"github.com/go-chi/chi"
-
 	"github.com/jinzhu/gorm"
+
 	"github.com/jrozner/the-intercept-2019/web/model"
 )
 
@@ -19,18 +19,12 @@ func getMessages(w http.ResponseWriter, r *http.Request) {
 		log.Panic("unable to retrieve database")
 	}
 
-	userID, ok := r.Context().Value("user").(uint64)
+	user, ok := r.Context().Value("user").(*model.User)
 	if !ok {
 		log.Panic("unable to retrieve user")
 	}
 
-	var user model.User
-	err := db.First(&user, "id = ?", userID).Error
-	if err != nil {
-		log.Panic(err)
-	}
-
-	err = db.Model(&user).Preload("Sender").Related(&user.Messages, "SentTo").Error
+	err := db.Model(&user).Preload("Sender").Related(&user.Messages, "SentTo").Error
 	if err != nil && err != gorm.ErrRecordNotFound {
 		log.Panic(err)
 	}
@@ -48,15 +42,9 @@ func getMessage(w http.ResponseWriter, r *http.Request) {
 		log.Panic("unable to retrieve database")
 	}
 
-	userID, ok := r.Context().Value("user").(uint64)
+	user, ok := r.Context().Value("user").(*model.User)
 	if !ok {
 		log.Panic("unable to retrieve user")
-	}
-
-	var user model.User
-	err := db.First(&user, "id = ?", userID).Error
-	if err != nil {
-		log.Panic(err)
 	}
 
 	idString := chi.URLParam(r, "id")
@@ -89,10 +77,9 @@ func createMessage(w http.ResponseWriter, r *http.Request) {
 		log.Panic("unable to retrieve database")
 	}
 
-	var user model.User
-	err := db.First(&user).Error
-	if err != nil {
-		log.Panic(err)
+	user, ok := r.Context().Value("user").(*model.User)
+	if !ok {
+		log.Panic("unable to retrieve user")
 	}
 
 	receiver, err := strconv.ParseUint(r.FormValue("receiver"), 10, 64)
@@ -124,15 +111,9 @@ func deleteMessage(w http.ResponseWriter, r *http.Request) {
 		log.Panic("unable to retrieve database")
 	}
 
-	userID, ok := r.Context().Value("user").(uint64)
+	user, ok := r.Context().Value("user").(*model.User)
 	if !ok {
 		log.Panic("unable to retrieve user")
-	}
-
-	var user model.User
-	err := db.First(&user, "id = ?", userID).Error
-	if err != nil {
-		log.Panic(err)
 	}
 
 	idString := chi.URLParam(r, "id")

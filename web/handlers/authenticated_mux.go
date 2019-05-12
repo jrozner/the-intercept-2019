@@ -4,6 +4,7 @@ import "github.com/go-chi/chi"
 
 func RegisterAuthenticated(mux *chi.Mux) {
 	mux.Get("/contacts", getContacts)
+	mux.Post("/rotate_secret", rotateSecret)
 	mux.Route("/messages", func(r chi.Router) {
 		r.Get("/", getMessages)
 		r.Get("/{id}", getMessage)

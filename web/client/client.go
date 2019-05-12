@@ -175,10 +175,9 @@ func (c *Client) RotateSecret() {}
 // access and secret keys if all went well. Unlike the other high level API
 // methods this one specifically bypasses our implementation of Do to avoid
 // trying to sign the request as keys should not be available at this time
-func (c *Client) Register(firstName, lastName, serial string) (*Keys, error) {
+func (c *Client) Register(teamName, serial string) (*Keys, error) {
 	body := url.Values{}
-	body.Add("first_name", firstName)
-	body.Add("last_name", lastName)
+	body.Add("team_name", teamName)
 	body.Add("serial", serial)
 
 	response, err := c.client.PostForm("/register", body)
@@ -206,6 +205,21 @@ func (c *Client) signRequest(request *http.Request) (string, error) {
 	digest := hex.EncodeToString(h.Sum(nil))
 
 	return digest, nil
+}
+
+func (c *Client) SetAccessKey(accessKey string) {
+	c.accessKey = accessKey
+}
+
+func (c *Client) SetSecretKey(secretKey string) error {
+	secret, err := hex.DecodeString(secretKey)
+	if err != nil {
+		return ErrInvalidKey
+	}
+
+	c.secretKey = secret
+
+	return nil
 }
 
 func NewClient(host, accessKey, secretKey string) (*Client, error) {
