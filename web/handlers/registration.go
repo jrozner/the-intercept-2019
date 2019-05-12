@@ -35,14 +35,8 @@ func Register(w http.ResponseWriter, r *http.Request) {
 		log.Panic(err)
 	}
 
-	firstName := r.FormValue("first_name")
-	if firstName == "" {
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	lastName := r.FormValue("last_name")
-	if lastName == "" {
+	teamName := r.FormValue("team_name")
+	if teamName == "" {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -54,8 +48,7 @@ func Register(w http.ResponseWriter, r *http.Request) {
 	}
 
 	user := model.User{
-		FirstName: firstName,
-		LastName:  lastName,
+		TeamName:  teamName,
 		Serial:    serial,
 		AccessKey: hex.EncodeToString(accessKey),
 		SecretKey: hex.EncodeToString(secretKey),

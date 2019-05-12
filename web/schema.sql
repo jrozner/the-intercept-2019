@@ -1,7 +1,6 @@
 create table users (
     id int not null auto_increment,
-    first_name varchar(254) not null,
-    last_name varchar(254) not null,
+    team_name varchar(254) unique not null,
     access_key varchar(254) unique not null,
     secret_key varchar(254) not null,
     serial varchar(254) unique not null,

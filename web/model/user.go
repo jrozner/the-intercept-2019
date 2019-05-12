@@ -4,8 +4,7 @@ import "time"
 
 type User struct {
 	ID           uint64     `json:"-"`
-	FirstName    string     `json:"first_name"`
-	LastName     string     `json:"last_name"`
+	TeamName     string     `json:"team_name"`
 	Messages     []Message  `json:"-" gorm:"foreignKey:SentTo"`
 	SentMessages []Message  `json:"-" gorm:"foreignKey:SentBy"`
 	AccessKey    string     `json:"-"`
