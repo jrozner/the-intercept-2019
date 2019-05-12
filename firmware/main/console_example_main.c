@@ -227,9 +227,10 @@ void app_main() {
     // Allow seeing the boot informational messages about memory setup/entry point/etc
     // Disable errors with
     #if PROD
+        //ESP_LOGI(TAG, "+ + + Logging DISABLED + + +!\n");
         esp_log_level_set("*", ESP_LOG_ERROR); 
     #else // logging enabled (debug build only)
-        ESP_LOGI(TAG, "Entering app_main - logging still enabled!\n");
+        ESP_LOGE(TAG, "Dev Mode - Info Logging Enabled!\n");
     #endif
 
     // init system components for console
@@ -248,9 +249,9 @@ void app_main() {
 
     // TODO prod values
     // Join game WIFI network
-    if (wifi_join("NSL","1qaz2wsx3edc", 10)) {
-            printf("Can't connect to game network - please return to the HHV and restart me!\n");
-
+    if (!wifi_join("NSL","1qaz2wsx3edc", 10)) {
+            ESP_LOGE(TAG, "Can't connect to game network - please return to the HHV and restart me!\n");
+            //TODO halt ?
     }
 
     /////////////////////////////////////////////////
@@ -298,8 +299,6 @@ void app_main() {
     // MAIN CONSOLE LOOP	
     while(true) {
         char* line = linenoise(prompt);
-        printf("TIME\t%d\n", xTaskGetTickCount());
-
         if (line == NULL) { /* Ignore empty lines */
             continue;
         }

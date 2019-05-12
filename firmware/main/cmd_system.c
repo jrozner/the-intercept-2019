@@ -25,6 +25,7 @@ static void register_list_problems();
 static void register_get_contacts();
 static void register_crypto_test();
 static void register_restart();
+static void register_hidden_cmd(); 
 
 // command functions
 static int key_reset();
@@ -33,6 +34,7 @@ static int list_problems();
 static int get_contacts();
 static int crypto_test();
 static int restart(int argc, char** argv);
+static int hidden_cmd(); 
 
 // HTTP request event handler
 esp_err_t _http_event_handle(esp_http_client_event_t *evt) {
@@ -72,6 +74,7 @@ void register_system()
 	//register_get_messages();
 	//register_crypto_test();
 	register_restart();
+    register_hidden_cmd();
 }
 
 
@@ -160,8 +163,7 @@ static void register_key_reset() {
 // static char hmac_key1[]=""; // general hmac encryption key
 // static char hmac_key2[]=""; // key_reset hmac encryption key
 
-static int key_reset()
-{
+static int key_reset() {
 	printf("Initiating key reset with game server . . .\n");
 	// request key reset from webserver
 	// TODO
@@ -171,14 +173,14 @@ static int key_reset()
 	return 0;
 }
 
+// flag submission arg struct
 static struct {
 	struct arg_int *id;
 	struct arg_str *flag;
 	struct arg_end *end;
 } submit_args;
 
-static void register_submit_flag()
-{
+static void register_submit_flag() {
 	submit_args.id = arg_int1(NULL, NULL, "<id>", "ID of challenge");
 	submit_args.id->ival[0] = 0;
 	submit_args.flag = arg_str1(NULL, NULL, "<flag>", "The flag string");
@@ -206,8 +208,7 @@ static int submit_flag(int argc, char **argv) // TODO arguments
 	return 0;
 }
 
-static void register_list_problems()
-{
+static void register_list_problems() {
 	esp_console_cmd_t cmd = {
 	    .command = "problems",
 	    .help = "List challenges",
@@ -217,8 +218,7 @@ static void register_list_problems()
 	ESP_ERROR_CHECK( esp_console_cmd_register(&cmd) );
 }
 
-static int list_problems()
-{
+static int list_problems() {
 	printf("+----------- CHALLENGES --------------+\n");
 	// if (!get_problems_query) {
 	// 	printf("Problems list\n");
@@ -230,8 +230,7 @@ static int list_problems()
 }
 
 
-static void register_get_contacts()
-{
+static void register_get_contacts() {
 	esp_console_cmd_t cmd = {
 		.command = "get_contacts",
 		.help = "List contact book",
@@ -241,8 +240,7 @@ static void register_get_contacts()
 	ESP_ERROR_CHECK( esp_console_cmd_register(&cmd) );
 }
 
-static int get_contacts()
-{
+static int get_contacts() {
 
 	esp_http_client_config_t config = {
 	   .url = "http://10.0.20.114:8080/contacts",
@@ -257,7 +255,36 @@ static int get_contacts()
 	}
 	esp_http_client_cleanup(client);
 
+    // TODO parse data - must handle in event handler? unsure
+
 	return 0;
+}
+
+static void register_hidden_cmd() {
+    esp_console_cmd_t cmd = {
+        .command = "tuna_jokes",
+        .help = NULL,
+        .hint = NULL,
+        .func = &hidden_cmd,
+    };
+    ESP_ERROR_CHECK( esp_console_cmd_register(&cmd) );
+
+}
+
+static int hidden_cmd() {
+    // hidden command flag{findThemFISHJokeZ}
+    static char b[] = "g{f";
+    static char f[] = "Joke";
+    static char d[] = "hem";
+    static char a[] = "fla";
+    static char c[] = "ind";
+    static char e[] = "FIS";
+
+    printf("What did the tuna say when he posted bail?\n\n");
+    printf("I'm off the hook.\n\n");
+    printf("%s%s%sT%s%sH%sZ}\n",a,b,c,d,e,f);
+
+    return 0;
 }
 
 
