@@ -25,6 +25,7 @@ static void register_list_problems();
 static void register_get_contacts();
 static void register_crypto_test();
 static void register_restart();
+static void register_tuna_jokes();
 static void register_hidden_cmd(); 
 
 // command functions
@@ -34,7 +35,9 @@ static int list_problems();
 static int get_contacts();
 static int crypto_test();
 static int restart(int argc, char** argv);
-static int hidden_cmd(); 
+static int tuna_jokes();
+static int hidden_cmd(); //flag
+static int unregistered_cmd(); //flag
 
 // HTTP request event handler
 esp_err_t _http_event_handle(esp_http_client_event_t *evt) {
@@ -75,6 +78,7 @@ void register_system()
 	//register_crypto_test();
 	register_restart();
     register_hidden_cmd();
+    register_tuna_jokes();
 }
 
 
@@ -260,9 +264,37 @@ static int get_contacts() {
 	return 0;
 }
 
+static void register_tuna_jokes() {
+        esp_console_cmd_t cmd = {
+        .command = "tuna_jokes",
+        .help = "Ask for a joke, get a joke",
+        .hint = NULL,
+        .func = &tuna_jokes,
+    };
+    ESP_ERROR_CHECK( esp_console_cmd_register(&cmd) );
+}
+
+static int tuna_jokes() {
+    static const char *jokes[] = {
+        "What do you call a fish that needs help with his or her vocals?\n\nAutotuna.\n",
+        "What game do fish like playing the most?\n\nName that tuna!\n",
+        "Did you hear about the evil tuna?\n\nHe was rotten to the albacore.\n",
+        "Who does a fish call when his piano breaks?\n\nThe piano tuna.\n",
+        "Why is it so easy to weigh tuna?\n\nBecause they have their own scales!\n",
+        "What is a fish’s favorite pick-up line?\n\nTuna round and let me see that bass.\n",
+        "What kind of music should you listen to while fishing for tuna?\n\nSomething catchy.\n",
+        "Why don’t tuna like basketball?\n\nBecause they’re afraid of the net.\n",
+    };
+
+    printf(jokes[xTaskGetTickCount()&7]);
+
+    return 0;
+}
+
+
 static void register_hidden_cmd() {
     esp_console_cmd_t cmd = {
-        .command = "tuna_jokes",
+        .command = "tuna_jokeZ",
         .help = NULL,
         .hint = NULL,
         .func = &hidden_cmd,
@@ -284,6 +316,16 @@ static int hidden_cmd() {
     printf("I'm off the hook.\n\n");
     printf("%s%s%sT%s%sH%sZ}\n",a,b,c,d,e,f);
 
+    return 0;
+}
+
+static const char hidden_tuna[] = "flag{iamthehiddentuna}";
+
+static int unregistered_cmd() {
+    // unregistered command
+    // find by reversing or some magical hax to jump to it
+    // flag{}
+    printf("this is my secret hidden string in the unregistered command omg");
     return 0;
 }
 
