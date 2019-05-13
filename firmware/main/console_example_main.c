@@ -143,6 +143,27 @@ static void IRAM_ATTR gpio_isr_handler_sw2(void* arg) {
 // debounce vars for digital switches
 bool old_state_sw1=0, old_state_sw2=0;
 
+// TODO move me to NVS
+bool tamper_detected = 0; // TODO load from NVS
+bool tamper_notified = 0;
+
+static const char tamper_msg[] =
+"Tampering has been detected. COOLTUNA security protocols enforced.\n"
+"All commands have been disabled except: key_reset\n\n"
+"Please restore product packaging to its original condition and\n"
+"use this command to re-authenticate with the server!\n";
+
+/*
+
+static void tamper_detected() {
+    tamper_detected = 1; // TODO NVS
+    ESP_LOGE(TAG, tamper_msg);
+    tamper_notified = 1;
+}
+
+*/
+
+
 // Task handling digital sensor notifications from ISRs
 static void sensor_handler_digi(void *arg) {
     uint32_t io_num;
@@ -161,35 +182,55 @@ static void sensor_handler_digi(void *arg) {
             switch(io_num) {
                 case SENSOR_SW1:
                     if (state && state != old_state_sw1) {
-                        printf("TAMPERING DETECTED? sw %d\n", io_num);
+#if !PROD
+                        //printf("[DEV] TAMPERING DETECTED? sw %d\n", io_num);
+                        ESP_LOGW(TAG, "[DEV] TAMPERING DETECTED? sw %d\n", io_num);
+#endif
+                        tamper_detected=1;
                     }
                     old_state_sw1 = state;
                     break;
                 case SENSOR_SW2:
                     if (state && state != old_state_sw2) {
-                        printf("TAMPERING DETECTED? sw %d\n", io_num);
+#if !PROD
+                        //printf("[DEV] TAMPERING DETECTED? sw %d\n", io_num);
+                        ESP_LOGW(TAG, "[DEV] TAMPERING DETECTED? sw %d\n", io_num);
+#endif
+                        tamper_detected=1;
                     }
                     old_state_sw2 = state;
                     break;
+            }
+            if (tamper_detected && !tamper_notified) { // prevent spam
+                //printf(tamper_msg);
+                ESP_LOGE(TAG, "%s", tamper_msg); // there's some bug here that causes a stack overflow?
+                tamper_notified=1;
             }
         }
     }
 }
 
 // Task handling analog sensor
-// Can't ISR this? Instead does polling via task delay and analog reads
+// Polling via task delay and analog reads
 static void sensor_handler_ana(void *arg) {
     const TickType_t delay_ms = 50/portTICK_PERIOD_MS;
 
     adc1_config_width(ADC_WIDTH_BIT_12);
     adc1_config_channel_atten(ADC1_CHANNEL_5,ADC_ATTEN_DB_0);
-    for( ;; )
-    {
-        //adc1_config_width(ADC_WIDTH_BIT_12);
-        //adc1_config_channel_atten(ADC1_CHANNEL_5,ADC_ATTEN_DB_0);
+    for( ;; ) {
         int val = adc1_get_raw(ADC1_CHANNEL_5);
         if (val > 0) { 
-            printf("TAMPERING DETECTED\t%d\n", val);
+#if !PROD
+            printf("[DEV] TAMPERING DETECTED? (analog) %d\n", val);
+#endif
+            tamper_detected=1;
+            if (!tamper_notified) { // prevent spam
+                //printf(tamper_msg);
+                ESP_LOGE(TAG, "%s", tamper_msg);
+                tamper_notified=1; // possible race condition with the other task?
+                                   // modifying the check to this format seems better
+                                   // (previously double alerting tamper_msg on console)
+            }
         }
         
         vTaskDelay( delay_ms );
@@ -230,7 +271,7 @@ void app_main() {
         //ESP_LOGI(TAG, "+ + + Logging DISABLED + + +!\n");
         esp_log_level_set("*", ESP_LOG_ERROR); 
     #else // logging enabled (debug build only)
-        ESP_LOGE(TAG, "Dev Mode - Info Logging Enabled!\n");
+        ESP_LOGW(TAG, "[DEV] Info Logging Enabled!");
     #endif
 
     // init system components for console
@@ -250,8 +291,17 @@ void app_main() {
     // TODO prod values
     // Join game WIFI network
     if (!wifi_join("NSL","1qaz2wsx3edc", 10)) {
-            ESP_LOGE(TAG, "Can't connect to game network - please return to the HHV and restart me!\n");
-            //TODO halt ?
+        ESP_LOGE(TAG, "Can't connect to game network - restarting in 10 seconds!");
+#if PROD
+        uint8_t i = 0;
+        for (i=0; i<10; i++) {
+            printf("%d...",10-i);
+            vTaskDelay((TickType_t) (1000/portTICK_PERIOD_MS));
+        }
+        esp_restart();
+#else
+        ESP_LOGW(TAG, "[DEV] Restart aborted due to dev move.");
+#endif
     }
 
     /////////////////////////////////////////////////
@@ -276,7 +326,17 @@ void app_main() {
     //hook isr handler for specific gpio pin
     gpio_isr_handler_add(SENSOR_SW1, gpio_isr_handler_sw1, (void*) SENSOR_SW1);
     gpio_isr_handler_add(SENSOR_SW2, gpio_isr_handler_sw2, (void*) SENSOR_SW2);
-   
+
+    // Board started with switches "out" (triggered) bypasses ISR
+    // Manually check to verify they are not high
+    if (gpio_get_level(SENSOR_SW1) | gpio_get_level(SENSOR_SW2)) {
+#if !PROD
+        ESP_LOGW(TAG, "[DEV] On-Boot Tamper Detected\n");
+#endif
+        tamper_detected=1;
+        tamper_notified=1;
+        ESP_LOGE(TAG, "%s", tamper_msg);
+    }
 
     /////////////////////////////////////////////////
     //	Console setup
