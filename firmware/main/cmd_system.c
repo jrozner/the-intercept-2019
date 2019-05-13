@@ -37,7 +37,7 @@ static int crypto_test();
 static int restart(int argc, char** argv);
 static int tuna_jokes();
 static int hidden_cmd(); //flag
-static int unregistered_cmd(); //flag
+static __attribute__((used)) int unregistered_cmd(); //flag
 
 // HTTP request event handler
 esp_err_t _http_event_handle(esp_http_client_event_t *evt) {
@@ -319,7 +319,7 @@ static int hidden_cmd() {
     return 0;
 }
 
-static const char hidden_tuna[] = "flag{iamthehiddentuna}";
+static const char __attribute__((used)) hidden_tuna[] = "flag{iamthehiddentuna}";
 
 static int unregistered_cmd() {
     // unregistered command
