@@ -183,8 +183,7 @@ static void sensor_handler_digi(void *arg) {
                 case SENSOR_SW1:
                     if (state && state != old_state_sw1) {
 #if !PROD
-                        //printf("[DEV] TAMPERING DETECTED? sw %d\n", io_num);
-                        ESP_LOGW(TAG, "[DEV] TAMPERING DETECTED? sw %d\n", io_num);
+                        ESP_LOGW(TAG, "[DEV] TAMPERING DETECTED? SW1 (%d)", io_num);
 #endif
                         tamper_detected=1;
                     }
@@ -194,7 +193,7 @@ static void sensor_handler_digi(void *arg) {
                     if (state && state != old_state_sw2) {
 #if !PROD
                         //printf("[DEV] TAMPERING DETECTED? sw %d\n", io_num);
-                        ESP_LOGW(TAG, "[DEV] TAMPERING DETECTED? sw %d\n", io_num);
+                        ESP_LOGW(TAG, "[DEV] TAMPERING DETECTED? SW2 (%d)", io_num);
 #endif
                         tamper_detected=1;
                     }
@@ -203,7 +202,7 @@ static void sensor_handler_digi(void *arg) {
             }
             if (tamper_detected && !tamper_notified) { // prevent spam
                 //printf(tamper_msg);
-                ESP_LOGE(TAG, "%s", tamper_msg); // there's some bug here that causes a stack overflow?
+                ESP_LOGE(TAG, "%s", tamper_msg);
                 tamper_notified=1;
             }
         }
@@ -221,7 +220,7 @@ static void sensor_handler_ana(void *arg) {
         int val = adc1_get_raw(ADC1_CHANNEL_5);
         if (val > 0) { 
 #if !PROD
-            printf("[DEV] TAMPERING DETECTED? (analog) %d\n", val);
+            ESP_LOGW(TAG, "[DEV] TAMPERING DETECTED? ANALOG (%d)", val);
 #endif
             tamper_detected=1;
             if (!tamper_notified) { // prevent spam
@@ -300,7 +299,7 @@ void app_main() {
         }
         esp_restart();
 #else
-        ESP_LOGW(TAG, "[DEV] Restart aborted due to dev move.");
+        ESP_LOGW(TAG, "[DEV] Restart aborted due to dev mode.");
 #endif
     }
 
@@ -317,9 +316,9 @@ void app_main() {
     gpio_evt_queue = xQueueCreate(10, sizeof(uint32_t));
 
     //start digital sensor task
-    xTaskCreate(sensor_handler_digi, "sensor_handler_digi", 2048, NULL, 10, NULL);
+    xTaskCreate(sensor_handler_digi, "sensor_handler_digi", 4096, NULL, 10, NULL);
     //start analog sensor task
-    xTaskCreate(sensor_handler_ana, "sensor_handler_ana", 2048, NULL, 10, NULL);
+    xTaskCreate(sensor_handler_ana, "sensor_handler_ana", 4096, NULL, 10, NULL);
 
     //install gpio isr service
     gpio_install_isr_service(0);
@@ -331,7 +330,7 @@ void app_main() {
     // Manually check to verify they are not high
     if (gpio_get_level(SENSOR_SW1) | gpio_get_level(SENSOR_SW2)) {
 #if !PROD
-        ESP_LOGW(TAG, "[DEV] On-Boot Tamper Detected\n");
+        ESP_LOGW(TAG, "[DEV] On-Boot Tamper Detected");
 #endif
         tamper_detected=1;
         tamper_notified=1;
