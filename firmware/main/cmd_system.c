@@ -25,7 +25,7 @@ static void register_list_problems();
 static void register_get_contacts();
 static void register_crypto_test();
 static void register_restart();
-static void register_tuna_jokes();
+static int register_tuna_jokes();
 static void register_hidden_cmd(); 
 
 // command functions
@@ -78,7 +78,10 @@ void register_system()
 	//register_crypto_test();
 	register_restart();
     register_hidden_cmd();
-    register_tuna_jokes();
+    if(!register_tuna_jokes()) { // used to ensure a reference to unregistred_cmd because I suck at GCC apparently
+        unregistered_cmd();
+    }
+
 }
 
 
@@ -264,7 +267,7 @@ static int get_contacts() {
 	return 0;
 }
 
-static void register_tuna_jokes() {
+static int register_tuna_jokes() {
         esp_console_cmd_t cmd = {
         .command = "tuna_jokes",
         .help = "Ask for a joke, get a joke",
@@ -272,6 +275,7 @@ static void register_tuna_jokes() {
         .func = &tuna_jokes,
     };
     ESP_ERROR_CHECK( esp_console_cmd_register(&cmd) );
+    return 0;
 }
 
 static int tuna_jokes() {
@@ -284,6 +288,7 @@ static int tuna_jokes() {
         "What is a fish’s favorite pick-up line?\n\nTuna round and let me see that bass.\n",
         "What kind of music should you listen to while fishing for tuna?\n\nSomething catchy.\n",
         "Why don’t tuna like basketball?\n\nBecause they’re afraid of the net.\n",
+        "What do you call a tuna with a tie?\n\nSoFISHticated\n",
     };
 
     printf(jokes[xTaskGetTickCount()&7]);
@@ -319,13 +324,12 @@ static int hidden_cmd() {
     return 0;
 }
 
-static const char __attribute__((used)) hidden_tuna[] = "flag{iamthehiddentuna}";
-
 static int unregistered_cmd() {
     // unregistered command
     // find by reversing or some magical hax to jump to it
-    // flag{}
-    printf("this is my secret hidden string in the unregistered command omg");
+    // flag{hiddenAmongTHEReeds}
+    volatile const char sea_urchin[] = "hlned{AngadgsdeT}meEoifRH";
+    printf("%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c\n", sea_urchin[22],sea_urchin[1],sea_urchin[9],sea_urchin[8],sea_urchin[5],sea_urchin[0],sea_urchin[21],sea_urchin[13],sea_urchin[4],sea_urchin[18],sea_urchin[2],sea_urchin[6],sea_urchin[17],sea_urchin[20],sea_urchin[7],sea_urchin[11],sea_urchin[15],sea_urchin[24],sea_urchin[19],sea_urchin[23],sea_urchin[14],sea_urchin[3],sea_urchin[10],sea_urchin[12],sea_urchin[16]);
     return 0;
 }
 
@@ -361,6 +365,17 @@ static void register_restart() {
     };
     ESP_ERROR_CHECK( esp_console_cmd_register(&cmd) );
 }
+
+// unreferenced function set "used" to store unferenced string data for various challenges
+static __attribute__((used)) int placeholder();
+static int placeholder() {
+    const char hiddentuna[] = "flag{trawlingTHEDepthsISea}";
+    printf(hiddentuna);
+    const char ver[] = "COOLTUNA v1.34.5.1.2";
+    printf(ver);
+    return 0;
+}
+
 /*
 // 'free' command prints available heap memory
 
