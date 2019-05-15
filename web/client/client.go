@@ -1,6 +1,7 @@
 package client
 
 import (
+	"bytes"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
@@ -8,16 +9,22 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"net/url"
-	"strconv"
 	"strings"
 
 	"github.com/jrozner/the-intercept-2019/web/model"
 )
 
-var ErrInvalidKey = errors.New("invalid secret key")
+var (
+	ErrInvalidKey    = errors.New("invalid secret key")
+	ErrBadRequest    = errors.New("bad request")
+	ErrInternalError = errors.New("internal error")
+	ErrUnauthorized  = errors.New("unauthorized")
+	ErrUnknown       = errors.New("unknown error")
+)
 
 type Keys struct {
 	AccessKey string `json:"access_key"`
@@ -32,7 +39,7 @@ type Client struct {
 }
 
 func (c *Client) Get(endpoint string) (*http.Response, error) {
-	request, err := http.NewRequest(http.MethodGet, endpoint, nil)
+	request, err := http.NewRequest(http.MethodGet, c.host+endpoint, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -41,7 +48,7 @@ func (c *Client) Get(endpoint string) (*http.Response, error) {
 }
 
 func (c *Client) Post(endpoint string, body url.Values) (*http.Response, error) {
-	request, err := http.NewRequest(http.MethodPost, endpoint, strings.NewReader(body.Encode()))
+	request, err := http.NewRequest(http.MethodPost, c.host+endpoint, strings.NewReader(body.Encode()))
 	if err != nil {
 		return nil, err
 	}
@@ -52,7 +59,7 @@ func (c *Client) Post(endpoint string, body url.Values) (*http.Response, error) 
 }
 
 func (c *Client) Delete(endpoint string) (*http.Response, error) {
-	request, err := http.NewRequest(http.MethodDelete, endpoint, nil)
+	request, err := http.NewRequest(http.MethodDelete, c.host+endpoint, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -84,30 +91,33 @@ func (c *Client) GetContacts() ([]model.User, error) {
 		}
 	}(response)
 
+	err = checkStatus(response.StatusCode, http.StatusOK)
+	if err != nil {
+		return nil, err
+	}
+
 	var contacts []model.User
-	err = json.NewDecoder(response.Body).Decode(contacts)
+	err = json.NewDecoder(response.Body).Decode(&contacts)
 
 	return contacts, nil
 }
 
-func (c *Client) SendMessage(receiver, message string) (uint64, error) {
+func (c *Client) SendMessage(receiver, message string) error {
 	body := url.Values{}
 	body.Add("receiver", receiver)
-	body.Add("message", message)
+	body.Add("text", message)
 
 	response, err := c.Post("/messages", body)
 	if err != nil {
-		return 0, err
+		return err
 	}
 
-	location := response.Header.Get("Location")
-	parts := strings.Split(location, "/")
-	id, err := strconv.ParseUint(parts[len(parts)-1], 10, 64)
+	err = checkStatus(response.StatusCode, http.StatusCreated)
 	if err != nil {
-		return 0, err
+		return err
 	}
 
-	return id, nil
+	return nil
 }
 
 func (c *Client) GetMessages() ([]model.Message, error) {
@@ -123,8 +133,13 @@ func (c *Client) GetMessages() ([]model.Message, error) {
 		}
 	}(response)
 
+	err = checkStatus(response.StatusCode, http.StatusOK)
+	if err != nil {
+		return nil, err
+	}
+
 	var messages []model.Message
-	err = json.NewDecoder(response.Body).Decode(messages)
+	err = json.NewDecoder(response.Body).Decode(&messages)
 
 	return messages, nil
 }
@@ -142,6 +157,11 @@ func (c *Client) GetMessage(id uint64) (*model.Message, error) {
 			log.Println("unable to close body")
 		}
 	}(response)
+
+	err = checkStatus(response.StatusCode, http.StatusOK)
+	if err != nil {
+		return nil, err
+	}
 
 	message := &model.Message{}
 	err = json.NewDecoder(response.Body).Decode(&message)
@@ -166,10 +186,37 @@ func (c *Client) DeleteMessage(id uint64) error {
 		}
 	}(response)
 
+	err = checkStatus(response.StatusCode, http.StatusOK)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
-func (c *Client) RotateSecret() {}
+func (c *Client) RotateSecret() (*Keys, error) {
+	response, err := c.Post("/rotate_secret", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	defer func(response *http.Response) {
+		err := response.Body.Close()
+		if err != nil {
+			log.Println("unable to close response body")
+		}
+	}(response)
+
+	err = checkStatus(response.StatusCode, http.StatusOK)
+	if err != nil {
+		return nil, err
+	}
+
+	keys := &Keys{}
+	err = json.NewDecoder(response.Body).Decode(keys)
+
+	return keys, nil
+}
 
 // Register sends a registration request to the server and responds with the
 // access and secret keys if all went well. Unlike the other high level API
@@ -180,7 +227,12 @@ func (c *Client) Register(teamName, serial string) (*Keys, error) {
 	body.Add("team_name", teamName)
 	body.Add("serial", serial)
 
-	response, err := c.client.PostForm("/register", body)
+	response, err := c.client.PostForm(c.host+"/register", body)
+	if err != nil {
+		return nil, err
+	}
+
+	err = checkStatus(response.StatusCode, http.StatusOK)
 	if err != nil {
 		return nil, err
 	}
@@ -197,14 +249,41 @@ func (c *Client) Register(teamName, serial string) (*Keys, error) {
 func (c *Client) signRequest(request *http.Request) (string, error) {
 	h := hmac.New(sha256.New, c.secretKey)
 	h.Write([]byte(request.Method))
-	_, err := io.Copy(h, request.Body)
-	if err != nil {
-		return "", err
+	body := request.Body
+	if body != nil {
+		// this whole thing is stupid because http.NewRequest wraps the body in a ReadCloser which isn't a Seeker
+		b, err := ioutil.ReadAll(request.Body)
+		if err != nil {
+			return "", err
+		}
+
+		err = request.Body.Close()
+		if err != nil {
+			return "", err
+		}
+
+		bb := bytes.NewReader(b)
+
+		_, err = io.Copy(h, bb)
+		if err != nil {
+			return "", err
+		}
+
+		_, err = bb.Seek(0, 0)
+		if err != nil {
+			log.Panic(err)
+		}
+
+		request.Body = ioutil.NopCloser(bb)
 	}
 
 	digest := hex.EncodeToString(h.Sum(nil))
 
 	return digest, nil
+}
+
+func (c *Client) SetHost(host string) {
+	c.host = host
 }
 
 func (c *Client) SetAccessKey(accessKey string) {
@@ -234,4 +313,21 @@ func NewClient(host, accessKey, secretKey string) (*Client, error) {
 		accessKey: accessKey,
 		secretKey: secret,
 	}, nil
+}
+
+func checkStatus(status, expected int) error {
+	if status == expected {
+		return nil
+	}
+
+	switch status {
+	case http.StatusBadRequest:
+		return ErrBadRequest
+	case http.StatusInternalServerError:
+		return ErrInternalError
+	case http.StatusUnauthorized:
+		return ErrUnauthorized
+	default:
+		return ErrUnknown
+	}
 }

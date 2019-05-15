@@ -82,7 +82,8 @@ func createMessage(w http.ResponseWriter, r *http.Request) {
 		log.Panic("unable to retrieve user")
 	}
 
-	receiver, err := strconv.ParseUint(r.FormValue("receiver"), 10, 64)
+	var receiver model.User
+	err := db.First(&receiver, "team_name = ?", r.FormValue("receiver")).Error
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
@@ -90,7 +91,7 @@ func createMessage(w http.ResponseWriter, r *http.Request) {
 
 	message := model.Message{
 		Text:   r.FormValue("text"),
-		SentTo: receiver,
+		SentTo: receiver.ID,
 		Seen:   false,
 	}
 

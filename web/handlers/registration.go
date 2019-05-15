@@ -77,9 +77,9 @@ func rotateSecret(w http.ResponseWriter, r *http.Request) {
 		log.Panic("unable to retrieve database")
 	}
 
-	user, ok := r.Context().Value("user").(model.User)
+	user, ok := r.Context().Value("user").(*model.User)
 	if !ok {
-		log.Panic("unable to retrieve database")
+		log.Panic("unable to retrieve user")
 	}
 
 	secret, err := generateKey(sha256.BlockSize)

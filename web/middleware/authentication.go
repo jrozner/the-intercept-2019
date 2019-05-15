@@ -113,7 +113,7 @@ func (a *authenticate) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		goto authfail
 	}
 
-	ctx = context.WithValue(r.Context(), "user", user)
+	ctx = context.WithValue(r.Context(), "user", &user)
 	r = r.WithContext(ctx)
 
 	a.h.ServeHTTP(w, r)

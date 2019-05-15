@@ -28,6 +28,7 @@ func main() {
 	router.Post("/register", handlers.Register)
 
 	authenticated := chi.NewMux()
+	authenticated.Use(mw.BufferBody)
 	authenticated.Use(mw.Authenticate(db))
 	handlers.RegisterAuthenticated(authenticated)
 	router.Mount("/", authenticated)
