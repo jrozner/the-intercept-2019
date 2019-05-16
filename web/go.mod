@@ -9,6 +9,7 @@ require (
 	github.com/fatih/color v1.7.0 // indirect
 	github.com/flynn-archive/go-shlex v0.0.0-20150515145356-3f9db97f8568 // indirect
 	github.com/go-chi/chi v4.0.2+incompatible
+	github.com/go-sql-driver/mysql v1.4.1
 	github.com/jinzhu/gorm v1.9.4
 	github.com/jinzhu/now v1.0.0 // indirect
 	github.com/mattn/go-colorable v0.1.1 // indirect

@@ -23,6 +23,8 @@ var (
 	ErrBadRequest    = errors.New("bad request")
 	ErrInternalError = errors.New("internal error")
 	ErrUnauthorized  = errors.New("unauthorized")
+	ErrNotFound      = errors.New("not found")
+	ErrConflict      = errors.New("conflict")
 	ErrUnknown       = errors.New("unknown error")
 )
 
@@ -358,6 +360,10 @@ func checkStatus(status, expected int) error {
 		return ErrInternalError
 	case http.StatusUnauthorized:
 		return ErrUnauthorized
+	case http.StatusNotFound:
+		return ErrNotFound
+	case http.StatusConflict:
+		return ErrConflict
 	default:
 		return ErrUnknown
 	}

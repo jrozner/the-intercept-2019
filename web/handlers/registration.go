@@ -8,6 +8,8 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/go-sql-driver/mysql"
+
 	"github.com/jinzhu/gorm"
 
 	"github.com/jrozner/the-intercept-2019/web/model"
@@ -55,8 +57,14 @@ func Register(w http.ResponseWriter, r *http.Request) {
 
 	err = db.Save(&user).Error
 	if err != nil {
-		// TODO: should really handle the case here of an already registered serial number
-		log.Panic(err)
+		e, ok := err.(*mysql.MySQLError)
+		if ok && e.Number == 0x426 {
+			log.Println(err)
+			w.WriteHeader(http.StatusConflict)
+			return
+		} else {
+			log.Panic(err)
+		}
 	}
 
 	keys := keys{
