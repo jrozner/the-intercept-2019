@@ -120,8 +120,32 @@ func (c *Client) SendMessage(receiver, message string) error {
 	return nil
 }
 
-func (c *Client) GetMessages() ([]model.Message, error) {
+func (c *Client) GetUnreadMessages() ([]model.Message, error) {
 	response, err := c.Get("/messages")
+	if err != nil {
+		return nil, err
+	}
+
+	defer func(response *http.Response) {
+		err := response.Body.Close()
+		if err != nil {
+			log.Println("unable to close response body")
+		}
+	}(response)
+
+	err = checkStatus(response.StatusCode, http.StatusOK)
+	if err != nil {
+		return nil, err
+	}
+
+	var messages []model.Message
+	err = json.NewDecoder(response.Body).Decode(&messages)
+
+	return messages, nil
+}
+
+func (c *Client) GetAllMessages() ([]model.Message, error) {
+	response, err := c.Get("/messages/all")
 	if err != nil {
 		return nil, err
 	}
@@ -146,7 +170,7 @@ func (c *Client) GetMessages() ([]model.Message, error) {
 
 func (c *Client) GetMessage(id uint64) (*model.Message, error) {
 	endpoint := fmt.Sprintf("/messages/%d", id)
-	response, err := c.Delete(endpoint)
+	response, err := c.Get(endpoint)
 	if err != nil {
 		return nil, err
 	}

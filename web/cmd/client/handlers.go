@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"strconv"
 
 	"github.com/abiosoft/ishell"
 
@@ -81,16 +82,12 @@ func compose(ctx *ishell.Context) {
 }
 
 func unreadMessages(ctx *ishell.Context) {
-
-}
-
-func allMessages(ctx *ishell.Context) {
 	c, ok := ctx.Get("client").(*client.Client)
 	if !ok {
 		log.Panic("no client exists")
 	}
 
-	messages, err := c.GetMessages()
+	messages, err := c.GetUnreadMessages()
 	if err != nil {
 		ctx.Println(err)
 		return
@@ -102,8 +99,45 @@ func allMessages(ctx *ishell.Context) {
 
 }
 
-func readMessage(ctx *ishell.Context) {
+func allMessages(ctx *ishell.Context) {
+	c, ok := ctx.Get("client").(*client.Client)
+	if !ok {
+		log.Panic("no client exists")
+	}
 
+	messages, err := c.GetAllMessages()
+	if err != nil {
+		ctx.Println(err)
+		return
+	}
+
+	for _, message := range messages {
+		ctx.Printf("From %s\n\n%s\n\n----------------------------------------------\n", message.Sender.TeamName, message.Text)
+	}
+}
+
+func readMessage(ctx *ishell.Context) {
+	c, ok := ctx.Get("client").(*client.Client)
+	if !ok {
+		log.Panic("no client exists")
+	}
+
+	ctx.Print("enter the message id: ")
+	idString := ctx.ReadLine()
+
+	id, err := strconv.ParseUint(idString, 10, 64)
+	if err != nil {
+		ctx.Println(err)
+		return
+	}
+
+	message, err := c.GetMessage(id)
+	if err != nil {
+		ctx.Println(err)
+		return
+	}
+
+	ctx.Printf("From %s\n\n%s\n\n----------------------------------------------\n", message.Sender.TeamName, message.Text)
 }
 
 func rotateSecret(ctx *ishell.Context) {

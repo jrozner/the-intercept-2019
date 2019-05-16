@@ -13,7 +13,7 @@ import (
 	"github.com/jrozner/the-intercept-2019/web/model"
 )
 
-func getMessages(w http.ResponseWriter, r *http.Request) {
+func getAllMessages(w http.ResponseWriter, r *http.Request) {
 	db, ok := r.Context().Value("db").(*gorm.DB)
 	if !ok {
 		log.Panic("unable to retrieve database")
@@ -25,6 +25,29 @@ func getMessages(w http.ResponseWriter, r *http.Request) {
 	}
 
 	err := db.Model(&user).Preload("Sender").Related(&user.Messages, "SentTo").Error
+	if err != nil && err != gorm.ErrRecordNotFound {
+		log.Panic(err)
+	}
+
+	w.Header().Add("Content-Type", "application/json")
+	err = json.NewEncoder(w).Encode(user.Messages)
+	if err != nil {
+		log.Panic(err)
+	}
+}
+
+func getUnreadMessages(w http.ResponseWriter, r *http.Request) {
+	db, ok := r.Context().Value("db").(*gorm.DB)
+	if !ok {
+		log.Panic("unable to retrieve database")
+	}
+
+	user, ok := r.Context().Value("user").(*model.User)
+	if !ok {
+		log.Panic("unable to retrieve user")
+	}
+
+	err := db.Model(&user).Preload("Sender").Where("messages.seen = false").Related(&user.Messages, "SentTo").Error
 	if err != nil && err != gorm.ErrRecordNotFound {
 		log.Panic(err)
 	}
@@ -62,6 +85,13 @@ func getMessage(w http.ResponseWriter, r *http.Request) {
 		}
 
 		log.Panic(err)
+	}
+
+	message.Seen = true
+
+	err = db.Save(&message).Error
+	if err != nil {
+		log.Println(err)
 	}
 
 	w.Header().Add("Content-Type", "application/json")

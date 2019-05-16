@@ -19,6 +19,8 @@ func main() {
 		log.Fatal(err)
 	}
 
+	db.LogMode(true)
+
 	router := chi.NewMux()
 	router.Use(middleware.Logger)
 	router.Use(middleware.RequestID)
