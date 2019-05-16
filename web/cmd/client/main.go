@@ -18,7 +18,7 @@ func main() {
 		}
 	}
 
-	c, err := client.NewClient(config.Host, config.AccessKey, config.SecretKey)
+	c, err := client.NewClient(config.Host, config.AccessKey, config.SecretKey, config.Serial)
 	if err != nil {
 		log.Fatal(err)
 	}

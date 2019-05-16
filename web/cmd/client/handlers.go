@@ -34,7 +34,9 @@ func register(ctx *ishell.Context) {
 
 	config.AccessKey = keys.AccessKey
 	config.SecretKey = keys.SecretKey
+	config.Serial = serial
 	c.SetAccessKey(config.AccessKey)
+	c.SetSerial(config.Serial)
 	err = c.SetSecretKey(config.SecretKey)
 	if err != nil {
 		log.Panic(err)

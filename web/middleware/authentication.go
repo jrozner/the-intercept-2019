@@ -86,6 +86,7 @@ func (a *authenticate) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	mac = hmac.New(sha256.New, secret)
 
 	mac.Write([]byte(r.Method))
+	mac.Write([]byte(user.Serial))
 
 	_, err = io.Copy(mac, r.Body)
 	if err != nil {

@@ -10,6 +10,7 @@ type Config struct {
 	Host      string `json:"host"`
 	AccessKey string `json:"access_key"`
 	SecretKey string `json:"secret_key"`
+	Serial    string `json:"serial"`
 }
 
 func readConfig() (*Config, error) {

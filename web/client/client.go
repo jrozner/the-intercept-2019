@@ -36,6 +36,7 @@ type Client struct {
 	host      string
 	accessKey string
 	secretKey []byte
+	serial    string
 }
 
 func (c *Client) Get(endpoint string) (*http.Response, error) {
@@ -273,6 +274,7 @@ func (c *Client) Register(teamName, serial string) (*Keys, error) {
 func (c *Client) signRequest(request *http.Request) (string, error) {
 	h := hmac.New(sha256.New, c.secretKey)
 	h.Write([]byte(request.Method))
+	h.Write([]byte(c.serial))
 	body := request.Body
 	if body != nil {
 		// this whole thing is stupid because http.NewRequest wraps the body in a ReadCloser which isn't a Seeker
@@ -325,7 +327,11 @@ func (c *Client) SetSecretKey(secretKey string) error {
 	return nil
 }
 
-func NewClient(host, accessKey, secretKey string) (*Client, error) {
+func (c *Client) SetSerial(serial string) {
+	c.serial = serial
+}
+
+func NewClient(host, accessKey, secretKey, serial string) (*Client, error) {
 	secret, err := hex.DecodeString(secretKey)
 	if err != nil {
 		return nil, ErrInvalidKey
@@ -336,6 +342,7 @@ func NewClient(host, accessKey, secretKey string) (*Client, error) {
 		host:      host,
 		accessKey: accessKey,
 		secretKey: secret,
+		serial:    serial,
 	}, nil
 }
 
