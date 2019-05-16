@@ -31,6 +31,7 @@ create table flags (
     user_id int not null,
     created_at datetime not null,
     updated_at datetime not null,
+    deleted_at datetime,
     foreign key (user_id) references users(id),
     unique (challenge, user_id),
     primary key(id)

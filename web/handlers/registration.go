@@ -110,14 +110,7 @@ func rotateSecret(w http.ResponseWriter, r *http.Request) {
 		SecretKey: user.SecretKey,
 	}
 
-	err = db.Model(&user).Related(&user.Flags).Error
-	if err != nil {
-		if err != gorm.ErrRecordNotFound {
-			log.Panic(err)
-		}
-	}
-
-	err = db.Delete(user.Flags).Error
+	err = db.Model(&user).Preload("Flags").Where("user_id = ?", user.ID).Unscoped().Delete(&user.Flags).Error
 	if err != nil {
 		log.Panic(err)
 	}

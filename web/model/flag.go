@@ -9,4 +9,5 @@ type Flag struct {
 	UserID    uint64
 	CreatedAt time.Time
 	UpdatedAt time.Time
+	DeletedAt *time.Time
 }
