@@ -14,12 +14,18 @@ import (
 )
 
 func main() {
-	db, err := gorm.Open("mysql", "root@unix(/tmp/mysql.sock)/the_intercept?charset=utf8&parseTime=true")
+	config, err := readConfig()
+	if err != nil {
+		log.Fatal(err)
+	}
+	db, err := gorm.Open("mysql", config.DSN)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	db.LogMode(true)
+	if config.Debug {
+		db.LogMode(true)
+	}
 
 	router := chi.NewMux()
 	router.Use(middleware.Logger)
