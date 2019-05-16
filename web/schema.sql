@@ -23,3 +23,15 @@ create table messages (
     foreign key (sent_to) references users(id),
     primary key(id)
 );
+
+create table flags (
+    id int not null auto_increment,
+    challenge varchar(254) not null,
+    points int not null,
+    user_id int not null,
+    created_at datetime not null,
+    updated_at datetime not null,
+    foreign key (user_id) references users(id),
+    unique (challenge, user_id),
+    primary key(id)
+);

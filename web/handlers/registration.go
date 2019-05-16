@@ -89,6 +89,9 @@ func rotateSecret(w http.ResponseWriter, r *http.Request) {
 
 	user.SecretKey = secret
 
+	// NOTE(joe): gorm is shit with transactions so if any of this fails
+	// along the way bad shit will happen
+
 	err = db.Save(&user).Error
 	if err != nil {
 		log.Panic(err)
@@ -97,6 +100,18 @@ func rotateSecret(w http.ResponseWriter, r *http.Request) {
 	keys := &keys{
 		AccessKey: user.AccessKey,
 		SecretKey: user.SecretKey,
+	}
+
+	err = db.Model(&user).Related(&user.Flags).Error
+	if err != nil {
+		if err != gorm.ErrRecordNotFound {
+			log.Panic(err)
+		}
+	}
+
+	err = db.Delete(user.Flags).Error
+	if err != nil {
+		log.Panic(err)
 	}
 
 	w.Header().Add("Content-Type", "application/json")
