@@ -66,6 +66,7 @@ func (a *authenticate) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	err = a.db.Model(&user).First(&user, "access_key = ?", accessKey).Error
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {
+			log.Println("authentication: user not found for access key")
 			goto authfail
 		}
 
@@ -111,6 +112,7 @@ func (a *authenticate) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !hmac.Equal(expectedSignatureDecoded, computedSignature) {
+		log.Println("authentication: computed signature did not match")
 		goto authfail
 	}
 
@@ -118,6 +120,7 @@ func (a *authenticate) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	r = r.WithContext(ctx)
 
 	a.h.ServeHTTP(w, r)
+	return
 
 authfail:
 	status = http.StatusUnauthorized
