@@ -173,4 +173,6 @@ func deleteMessage(w http.ResponseWriter, r *http.Request) {
 
 		log.Panic(err)
 	}
+
+	w.WriteHeader(http.StatusOK)
 }
