@@ -3,4 +3,6 @@
 .idea
 web/cmd/server/server
 web/cmd/client/client
+web/cmd/flagbot/flagbot
 config.json
+flags.json
