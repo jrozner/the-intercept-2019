@@ -12,11 +12,14 @@
 #include "freertos/task.h"
 #include "soc/rtc_cntl_reg.h"
 #include "sdkconfig.h"
+#include "esp_http_client.h"
 
 #include "esp_http_client.h" // http requests
 #include "hwcrypto/aes.h" // aes crypto module
 
 static const char* TAG = "cmd_system";
+
+static char serial[12];
 
 // command console registration functions
 static void register_key_reset();
@@ -26,9 +29,11 @@ static void register_get_contacts();
 static void register_crypto_test();
 static void register_restart();
 static int register_tuna_jokes();
-static void register_hidden_cmd(); 
+static void register_hidden_cmd();
+static void register_register_team();
 
 // command functions
+static int register_team();
 static int key_reset();
 static int submit_flag();
 static int list_problems();
@@ -68,8 +73,8 @@ esp_err_t _http_event_handle(esp_http_client_event_t *evt) {
 }
 
 // Register all command handlers (besides wifi)
-void register_system()
-{
+void register_system() {
+    register_register_team();
 	register_key_reset();
 	register_submit_flag();
 	register_list_problems();
@@ -81,7 +86,6 @@ void register_system()
     if(!register_tuna_jokes()) { // used to ensure a reference to unregistred_cmd because I suck at GCC apparently
         unregistered_cmd();
     }
-
 }
 
 
@@ -147,6 +151,81 @@ static int crypto_test() {
 
     esp_aes_free( &ctx );	
 	return 0;
+}
+
+static struct {
+    struct arg_str *team_name;
+    struct arg_end *end;
+} register_arguments;
+
+static void register_register_team() {
+    register_arguments.team_name = arg_str1(NULL, NULL, "<team name>", "name of team");
+    register_arguments.end = arg_end(1);
+
+    esp_console_cmd_t cmd = {
+            .command = "register",
+            .help = "Register a new device",
+            .hint = NULL,
+            .func = &register_team,
+            .argtable = &register_arguments,
+    };
+    ESP_ERROR_CHECK( esp_console_cmd_register(&cmd) );
+}
+
+static int register_team(int argc, char **argv) {
+    char *url, *post_data;
+    esp_err_t err;
+
+    asprintf(&url, "%s/register", "http://192.168.1.215:8080");
+    asprintf(&post_data, "serial=%s&team_name=%s", serial, argv[1]);
+
+    esp_http_client_config_t config = {
+            .url = url,
+            .event_handler = _http_event_handle,
+    };
+    esp_http_client_handle_t client = esp_http_client_init(&config);
+
+    esp_http_client_set_method(client, HTTP_METHOD_POST);
+    esp_http_client_set_post_field(client, post_data, strlen(post_data));
+    err = esp_http_client_perform(client);
+    if (err == ESP_OK) {
+        ESP_LOGI(TAG, "HTTP POST Status = %d, content_length = %d",
+                 esp_http_client_get_status_code(client),
+                 esp_http_client_get_content_length(client));
+    } else {
+        ESP_LOGE(TAG, "HTTP POST request failed: %s", esp_err_to_name(err));
+    }
+
+    int content_length = esp_http_client_fetch_headers(client);
+    if (content_length == ESP_FAIL || content_length == 0) {
+        ESP_LOGE(TAG, "no length or chunked");
+        esp_http_client_cleanup(client);
+        free(url);
+        free(post_data);
+        return -1;
+    }
+
+    char *buffer = malloc(content_length+1);
+    if (buffer == NULL) {
+        ESP_LOGE(TAG, "unable to allocate space for buffer");
+        esp_http_client_cleanup(client);
+        free(url);
+        free(post_data);
+        return -1;
+    }
+
+    int total_read = 0, read_len = 0;
+    read_len = esp_http_client_read(client, buffer, content_length);
+
+    if (read_len < total_read) {
+        esp_http_client_cleanup(client);
+        free(buffer);
+        free(url);
+        free(post_data);
+        return -1;
+    }
+
+    return 0;
 }
 
 static void register_key_reset() {
@@ -239,7 +318,7 @@ static int list_problems() {
 
 static void register_get_contacts() {
 	esp_console_cmd_t cmd = {
-		.command = "get_contacts",
+		.command = "contacts",
 		.help = "List contact book",
 		.hint = NULL,
 		.func = &get_contacts,
@@ -248,19 +327,18 @@ static void register_get_contacts() {
 }
 
 static int get_contacts() {
+	//esp_http_client_config_t config = {
+	//   .url = "http://10.0.20.114:8080/contacts",
+	//   .event_handler = _http_event_handle,
+	//};
+	//esp_http_client_handle_t client = esp_http_client_init(&config);
+	//esp_err_t set_header = esp_http_client_set_header(client, "Authentication", "0"); // TODO HMAC header
+	//esp_err_t err = esp_http_client_perform(client);
 
-	esp_http_client_config_t config = {
-	   .url = "http://10.0.20.114:8080/contacts",
-	   .event_handler = _http_event_handle,
-	};
-	esp_http_client_handle_t client = esp_http_client_init(&config);	
-	//esp_err_t set_header = esp_http_client_set_header(client, "x-verification", "0") // TODO HMAC header
-	esp_err_t err = esp_http_client_perform(client);
-
-	if (err != ESP_OK) {
-		ESP_LOGE("get_contacts", "Error occured getting contact list!\n");
-	}
-	esp_http_client_cleanup(client);
+	//if (err != ESP_OK) {
+	//	ESP_LOGE("get_contacts", "Error occured getting contact list!\n");
+	//}
+	//esp_http_client_cleanup(client);
 
     // TODO parse data - must handle in event handler? unsure
 
