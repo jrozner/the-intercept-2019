@@ -178,7 +178,7 @@ func solveChallenge(db *gorm.DB, c *client.Client, recipient string, message str
 		log.Println(err)
 	}
 
-	err := c.SendMessage(recipient, "flag accepted")
+	err = c.SendMessage(recipient, "flag accepted")
 	if err != nil {
 		log.Println("failed to respond to user: ", err)
 	}
