@@ -4,9 +4,10 @@ import "time"
 
 type Flag struct {
 	ID        uint64
-	Challenge string
+	Name      string
+	Hint      string
+	Value     string
 	Points    int
-	UserID    uint64
 	CreatedAt time.Time
 	UpdatedAt time.Time
 	DeletedAt *time.Time

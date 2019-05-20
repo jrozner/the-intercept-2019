@@ -26,13 +26,22 @@ create table messages (
 
 create table flags (
     id int not null auto_increment,
-    challenge varchar(254) not null,
+    name varchar(254) not null unique,
+    hint text not null,
+    value varchar(254) not null unique,
     points int not null,
-    user_id int not null,
     created_at datetime not null,
     updated_at datetime not null,
     deleted_at datetime,
+    primary key(id)
+);
+
+create table user_flags (
+    id int not null auto_increment,
+    user_id int not null,
+    flag_id int not null,
     foreign key (user_id) references users(id),
-    unique (challenge, user_id),
+    foreign key (flag_id) references flags(id),
+    unique (user_id, flag_id),
     primary key(id)
 );

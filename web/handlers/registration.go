@@ -110,7 +110,7 @@ func rotateSecret(w http.ResponseWriter, r *http.Request) {
 		SecretKey: user.SecretKey,
 	}
 
-	err = db.Model(&user).Preload("Flags").Where("user_id = ?", user.ID).Unscoped().Delete(&user.Flags).Error
+	err = db.Model(&user).Association("Flags").Clear().Error
 	if err != nil {
 		log.Panic(err)
 	}

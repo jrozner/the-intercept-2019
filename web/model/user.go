@@ -7,7 +7,7 @@ type User struct {
 	TeamName     string     `json:"team_name"`
 	Messages     []Message  `json:"-" gorm:"foreignKey:SentTo"`
 	SentMessages []Message  `json:"-" gorm:"foreignKey:SentBy"`
-	Flags        []Flag     `json:"-"`
+	Flags        []Flag     `json:"-" gorm:"many2many:user_flags"`
 	AccessKey    string     `json:"-"`
 	SecretKey    string     `json:"-"`
 	Serial       string     `json:"serial"`

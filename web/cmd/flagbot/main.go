@@ -14,8 +14,6 @@ import (
 	"github.com/jrozner/the-intercept-2019/web/model"
 )
 
-var flags map[string]Flag
-
 func main() {
 	config, err := readConfig()
 	if err != nil {
@@ -29,11 +27,6 @@ func main() {
 
 	if config.Debug {
 		db.LogMode(true)
-	}
-
-	flags, err = readFlags()
-	if err != nil {
-		log.Fatal(err)
 	}
 
 	c, err := client.NewClient(config.Host, config.AccessKey, config.SecretKey, config.Serial)
@@ -65,9 +58,9 @@ func main() {
 			case "help":
 				sendHelp(c, recipient)
 			case "challenges":
-				sendChallenges(c, recipient)
+				sendChallenges(db, c, recipient)
 			case "challenge":
-				sendChallenge(c, recipient, remainder)
+				sendChallenge(db, c, recipient, remainder)
 			case "solve":
 				solveChallenge(db, c, recipient, remainder)
 			case "scoreboard":
@@ -93,29 +86,42 @@ func sendHelp(c *client.Client, recipient string) {
 	}
 }
 
-func sendChallenges(c *client.Client, recipient string) {
+func sendChallenges(db *gorm.DB, c *client.Client, recipient string) {
 	response := bytes.Buffer{}
 
-	for challenge, flag := range flags {
-		response.Write([]byte(fmt.Sprintf("%s %d\n", challenge, flag.Points)))
+	var flags []model.Flag
+	err := db.Find(&flags).Error
+	if err != nil {
+		log.Println(err)
+		return
 	}
 
-	err := c.SendMessage(recipient, response.String())
+	for _, flag := range flags {
+		response.Write([]byte(fmt.Sprintf("%s - %d\n", flag.Name, flag.Points)))
+	}
+
+	err = c.SendMessage(recipient, response.String())
 	if err != nil {
 		log.Println("failed to respond to user: ", err)
 	}
 }
 
-func sendChallenge(c *client.Client, recipient string, challenge string) {
-	flag, ok := flags[challenge]
-	if !ok {
-		err := c.SendMessage(recipient, fmt.Sprintf("challenge %s does not exist", challenge))
-		if err != nil {
-			log.Println("failed to respond to user: ", err)
+func sendChallenge(db *gorm.DB, c *client.Client, recipient string, challenge string) {
+	var flag model.Flag
+	err := db.First(&flag, "name = ?", challenge).Error
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			err := c.SendMessage(recipient, fmt.Sprintf("challenge %s does not exist", challenge))
+			if err != nil {
+				log.Println("failed to respond to user: ", err)
+			}
 		}
+
+		log.Println(err)
+		return
 	}
 
-	err := c.SendMessage(recipient, fmt.Sprintf("%s - %d\n\n%s", challenge, flag.Points, flag.Hint))
+	err = c.SendMessage(recipient, fmt.Sprintf("%s - %d\n\n%s", flag.Name, flag.Points, flag.Hint))
 	if err != nil {
 		log.Println("failed to respond to user: ", err)
 	}
@@ -133,14 +139,17 @@ func solveChallenge(db *gorm.DB, c *client.Client, recipient string, message str
 		return
 	}
 
-	flag, ok := flags[parts[0]]
-	if !ok {
-		log.Printf("Challenge '%s' doesn't exist\n", parts[0])
-		err := c.SendMessage(recipient, fmt.Sprintf("invalid challenge: %s", parts[0]))
-		if err != nil {
-			log.Println("failed to respond to user: ", err)
+	var flag model.Flag
+	err := db.First(&flag, "name = ?", parts[0]).Error
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			err := c.SendMessage(recipient, fmt.Sprintf("challenge %s does not exist", parts[0]))
+			if err != nil {
+				log.Println("failed to respond to user: ", err)
+			}
 		}
 
+		log.Println(err)
 		return
 	}
 
@@ -156,26 +165,15 @@ func solveChallenge(db *gorm.DB, c *client.Client, recipient string, message str
 	}
 
 	var user model.User
-	err := db.Model(&user).First(&user, "team_name = ?", recipient).Error
+	err = db.First(&user, "team_name = ?", recipient).Association("Flags").Append(&flag).Error
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {
 			log.Printf("sender %s doesn't exist\n", recipient)
-			return
+		} else {
+			log.Println(err)
 		}
 
-		log.Println(err)
 		return
-	}
-
-	newFlag := &model.Flag{
-		Challenge: parts[0],
-		Points:    flag.Points,
-		UserID:    user.ID,
-	}
-
-	err = db.Create(&newFlag).Error
-	if err != nil {
-		log.Println(err)
 	}
 
 	err = c.SendMessage(recipient, "flag accepted")
