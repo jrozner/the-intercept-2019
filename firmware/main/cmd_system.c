@@ -83,7 +83,7 @@ void register_system() {
 	//register_crypto_test();
 	register_restart();
     register_hidden_cmd();
-    if(!register_tuna_jokes()) { // used to ensure a reference to unregistred_cmd because I suck at GCC apparently
+    if(register_tuna_jokes() == 10) { // used to ensure a reference to unregistred_cmd because I suck at GCC apparently
         unregistered_cmd();
     }
 }
