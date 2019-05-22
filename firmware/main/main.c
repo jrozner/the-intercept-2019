@@ -287,8 +287,9 @@ void app_main() {
 
     // TODO prod values
     // Join game WIFI network
-    if (!wifi_join("interceptctfnet2","9w38ruaowfuaw86sty3", 10)) {
-        ESP_LOGE(TAG, "Can't connect to game network - restarting in 10 seconds!");
+    //if (!wifi_join("interceptctfnet2","9w38ruaowfuaw86sty3", 10)) {
+    wifi_join("interceptctfnet2","9w38ruaowfuaw86sty3", 10);
+    /*    ESP_LOGE(TAG, "Can't connect to game network - restarting in 10 seconds!");
 #if PROD
         uint8_t i = 0;
         for (i=0; i<10; i++) {
@@ -299,7 +300,7 @@ void app_main() {
 #else
         ESP_LOGW(TAG, "[DEV] Restart aborted due to dev mode.");
 #endif
-    }
+    }*/
 
     nvs_handle nvs;
     esp_err_t err;
