@@ -29,11 +29,10 @@
 
 #include <driver/adc.h>
 
-#include "cmd_decl.h"
 #include "cmd_wifi.c"
-#include "cmd_system.c"
+#include "shell.c"
 #include "common.h"
-#include "cmd_tamper.h"
+#include "tamper.h"
 
 #define PROD false
 
@@ -272,26 +271,9 @@ void app_main() {
 
     // register console command handlers
     register_system();
-    #if !PROD
-        register_wifi(); // register wifi command handlers (debug build only)
-    #endif
 
-    // TODO prod values
     // Join game WIFI network
     //if (!wifi_join("interceptctfnet2","9w38ruaowfuaw86sty3", 10)) {
-    wifi_join("interceptctfnet2","9w38ruaowfuaw86sty3", 10);
-    /*    ESP_LOGE(TAG, "Can't connect to game network - restarting in 10 seconds!");
-#if PROD
-        uint8_t i = 0;
-        for (i=0; i<10; i++) {
-            printf("%d...",10-i);
-            vTaskDelay((TickType_t) (1000/portTICK_PERIOD_MS));
-        }
-        esp_restart();
-#else
-        ESP_LOGW(TAG, "[DEV] Restart aborted due to dev mode.");
-#endif
-    }*/
 
     nvs_handle nvs;
     esp_err_t err;

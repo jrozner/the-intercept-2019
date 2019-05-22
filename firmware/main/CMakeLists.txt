@@ -1,7 +1,7 @@
-set(COMPONENT_SRCS "cmd_system.c"
+set(COMPONENT_SRCS "shell.c"
                    "cmd_wifi.c"
                    "main.c"
-                   "cmd_tamper.c"
+                   "tamper.c"
                    "http_client.c")
 set(COMPONENT_ADD_INCLUDEDIRS ".")
 

@@ -18,35 +18,12 @@
 #include "esp_http_client.h" // http requests
 #include "hwcrypto/aes.h" // aes crypto module
 
-#include "cmd_tamper.h"
-
-#define HOST "http://192.168.1.215:8080"
+#include "shell.h"
+#include "tamper.h"
 
 static const char* TAG = "cmd_system";
 
 static char serial[12];
-
-// command console registration functions
-static void register_factory_reset();
-static void register_restart();
-static int register_tuna_jokes();
-static void register_hidden_cmd();
-static void register_register_team();
-static void register_unread();
-static void register_contacts();
-static void register_read_message();
-static void register_compose();
-
-// command functions
-static int register_team(int argc, char **argv);
-static int unread(int argc, char **argv);
-static int read_message(int argc, char **argv);
-static int factory_reset(int argc, char **argv);
-static int contacts(int argc, char **argv);
-static int restart(int argc, char** argv);
-static int tuna_jokes(int argc, char **argv);
-static int hidden_cmd(int argc, char **argv); //flag
-static __attribute__((used)) int unregistered_cmd(); //flag
 
 // HTTP request event handler
 esp_err_t _http_event_handle(esp_http_client_event_t *evt) {
@@ -77,7 +54,7 @@ esp_err_t _http_event_handle(esp_http_client_event_t *evt) {
 }
 
 // Register all command handlers (besides wifi)
-void register_system() {
+static void register_system() {
     esp_console_register_help_command();
     register_register_team();
 	register_factory_reset();

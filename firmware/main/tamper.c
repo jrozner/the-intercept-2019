@@ -1,5 +1,5 @@
 #include <nvs.h>
-#include "cmd_tamper.h"
+#include "tamper.h"
 #include "common.h"
 
 uint8_t get_tamper_nvs(){

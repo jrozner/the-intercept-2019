@@ -1,1 +1,6 @@
+#ifndef THE_INTERCEPT_COMMON_H
+#define THE_INTERCEPT_COMMON_H
+
 #define STORAGE_NAMESPACE "storage"
+
+#endif
