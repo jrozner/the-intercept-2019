@@ -142,9 +142,48 @@ static void IRAM_ATTR gpio_isr_handler_sw2(void* arg) {
 // debounce vars for digital switches
 bool old_state_sw1=0, old_state_sw2=0;
 
-// TODO move me to NVS
-bool tamper_detected = 0; // TODO load from NVS
+// Tamper var globals
+//bool tamper_detected = 0; // loaded from NVS
 bool tamper_notified = 0;
+
+uint8_t get_tamper_nvs();
+void set_tamper_nvs(uint8_t val);
+
+uint8_t get_tamper_nvs(){
+    nvs_handle nvs;
+    esp_err_t err;
+    ESP_ERROR_CHECK(nvs_open(STORAGE_NAMESPACE, NVS_READWRITE, &nvs));
+
+    uint8_t val;
+    err = nvs_get_u8(nvs, "tamper", &val);
+    if (err != ESP_OK) {
+        if (err == ESP_ERR_NVS_NOT_FOUND) {
+            ESP_ERROR_CHECK(nvs_set_u8(nvs, "tamper", 0));
+            ESP_ERROR_CHECK(nvs_commit(nvs));
+            val = 0;
+        } else {
+            ESP_ERROR_CHECK(err);
+        }
+    }
+    nvs_close(nvs);
+    return val;
+}
+
+void set_tamper_nvs(uint8_t val) {
+    nvs_handle nvs;
+    esp_err_t err;
+    ESP_ERROR_CHECK(nvs_open(STORAGE_NAMESPACE, NVS_READWRITE, &nvs));
+
+    uint8_t read_val;
+    err = nvs_get_u8(nvs, "tamper", &read_val);
+    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) {
+        ESP_ERROR_CHECK(err);
+    }
+
+    ESP_ERROR_CHECK(nvs_set_u8(nvs, "tamper", val));
+    ESP_ERROR_CHECK(nvs_commit(nvs));
+    nvs_close(nvs);
+}
 
 static const char tamper_msg[] =
 "Tampering has been detected. COOLTUNA security protocols enforced.\n"
@@ -184,7 +223,8 @@ static void sensor_handler_digi(void *arg) {
 #if !PROD
                         ESP_LOGW(TAG, "[DEV] TAMPERING DETECTED? SW1 (%d)", io_num);
 #endif
-                        tamper_detected=1;
+                        //tamper_detected=1;
+                        set_tamper_nvs(1);
                     }
                     old_state_sw1 = state;
                     break;
@@ -194,12 +234,14 @@ static void sensor_handler_digi(void *arg) {
                         //printf("[DEV] TAMPERING DETECTED? sw %d\n", io_num);
                         ESP_LOGW(TAG, "[DEV] TAMPERING DETECTED? SW2 (%d)", io_num);
 #endif
-                        tamper_detected=1;
+                        //tamper_detected=1;
+                        set_tamper_nvs(1);
                     }
                     old_state_sw2 = state;
                     break;
             }
-            if (tamper_detected && !tamper_notified) { // prevent spam
+            //if (tamper_detected && !tamper_notified) { // prevent spam
+            if (get_tamper_nvs() && !tamper_notified) { // prevent spam
                 //printf(tamper_msg);
                 ESP_LOGE(TAG, "%s", tamper_msg);
                 tamper_notified=1;
@@ -221,7 +263,8 @@ static void sensor_handler_ana(void *arg) {
 #if !PROD
             ESP_LOGW(TAG, "[DEV] TAMPERING DETECTED? ANALOG (%d)", val);
 #endif
-            tamper_detected=1;
+            //tamper_detected=1;
+            set_tamper_nvs(1);
             if (!tamper_notified) { // prevent spam
                 //printf(tamper_msg);
                 ESP_LOGE(TAG, "%s", tamper_msg);
@@ -329,6 +372,9 @@ void app_main() {
 
     /////////////////////////////////////////////////
     // Tamper sensor pin setup
+
+    //tamper_detected = get_tamper_nvs();
+
     gpio_config_t io_conf;
     io_conf.intr_type = GPIO_PIN_INTR_POSEDGE;
     io_conf.mode = GPIO_MODE_INPUT;
@@ -352,11 +398,12 @@ void app_main() {
 
     // Board started with switches "out" (triggered) bypasses ISR
     // Manually check to verify they are not high
-    if (gpio_get_level(SENSOR_SW1) | gpio_get_level(SENSOR_SW2)) {
+    if (gpio_get_level(SENSOR_SW1) | gpio_get_level(SENSOR_SW2) | get_tamper_nvs()) {
 #if !PROD
         ESP_LOGW(TAG, "[DEV] On-Boot Tamper Detected");
 #endif
-        tamper_detected=1;
+        //tamper_detected=1;
+        set_tamper_nvs(1);
         tamper_notified=1;
         ESP_LOGE(TAG, "%s", tamper_msg);
     }
