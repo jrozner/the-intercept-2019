@@ -32,9 +32,11 @@
 #include "cmd_decl.h"
 #include "cmd_wifi.c"
 #include "cmd_system.c"
+#include "common.h"
+#include "cmd_tamper.h"
 
 #define PROD false
-#define STORAGE_NAMESPACE "storage"
+//#define STORAGE_NAMESPACE "storage"
 
 // sensor pins
 //#define SENSOR_PHOTO 33 //9 //moved to direct ADC1_CHANNEL_5 below
@@ -146,7 +148,7 @@ bool old_state_sw1=0, old_state_sw2=0;
 //bool tamper_detected = 0; // loaded from NVS
 bool tamper_notified = 0;
 
-uint8_t get_tamper_nvs();
+/*uint8_t get_tamper_nvs();
 void set_tamper_nvs(uint8_t val);
 
 uint8_t get_tamper_nvs(){
@@ -183,7 +185,7 @@ void set_tamper_nvs(uint8_t val) {
     ESP_ERROR_CHECK(nvs_set_u8(nvs, "tamper", val));
     ESP_ERROR_CHECK(nvs_commit(nvs));
     nvs_close(nvs);
-}
+}*/
 
 static const char tamper_msg[] =
 "Tampering has been detected. COOLTUNA security protocols enforced.\n"
@@ -406,6 +408,13 @@ void app_main() {
         set_tamper_nvs(1);
         tamper_notified=1;
         ESP_LOGE(TAG, "%s", tamper_msg);
+    } else {
+        char sa[] = "/%(.2\x04\x0f\x1d\x1c\x07\x08<9x\x07=! :4\n";
+        int i;
+        for (i=0; i<20; i++) {
+            sa[i] ^= 'I';
+        }
+        printf(sa);
     }
 
     /////////////////////////////////////////////////

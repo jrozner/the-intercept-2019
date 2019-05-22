@@ -17,6 +17,8 @@
 #include "esp_http_client.h" // http requests
 #include "hwcrypto/aes.h" // aes crypto module
 
+#include "cmd_tamper.h"
+
 #define HOST "http://10.0.10.111:8080"
 
 static const char* TAG = "cmd_system";
@@ -168,6 +170,7 @@ static void register_factory_reset() {
 }
 
 int factory_reset() {
+    set_tamper_nvs(0);
     return ESP_OK;
 }
 
