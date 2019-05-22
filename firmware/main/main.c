@@ -36,10 +36,8 @@
 #include "cmd_tamper.h"
 
 #define PROD false
-//#define STORAGE_NAMESPACE "storage"
 
 // sensor pins
-//#define SENSOR_PHOTO 33 //9 //moved to direct ADC1_CHANNEL_5 below
 #define SENSOR_SW1 4 //GPIO 4 - phys 6
 #define SENSOR_SW2 34 //GPIO 34 - phys 26
 
@@ -144,65 +142,13 @@ static void IRAM_ATTR gpio_isr_handler_sw2(void* arg) {
 // debounce vars for digital switches
 bool old_state_sw1=0, old_state_sw2=0;
 
-// Tamper var globals
-//bool tamper_detected = 0; // loaded from NVS
 bool tamper_notified = 0;
-
-/*uint8_t get_tamper_nvs();
-void set_tamper_nvs(uint8_t val);
-
-uint8_t get_tamper_nvs(){
-    nvs_handle nvs;
-    esp_err_t err;
-    ESP_ERROR_CHECK(nvs_open(STORAGE_NAMESPACE, NVS_READWRITE, &nvs));
-
-    uint8_t val;
-    err = nvs_get_u8(nvs, "tamper", &val);
-    if (err != ESP_OK) {
-        if (err == ESP_ERR_NVS_NOT_FOUND) {
-            ESP_ERROR_CHECK(nvs_set_u8(nvs, "tamper", 0));
-            ESP_ERROR_CHECK(nvs_commit(nvs));
-            val = 0;
-        } else {
-            ESP_ERROR_CHECK(err);
-        }
-    }
-    nvs_close(nvs);
-    return val;
-}
-
-void set_tamper_nvs(uint8_t val) {
-    nvs_handle nvs;
-    esp_err_t err;
-    ESP_ERROR_CHECK(nvs_open(STORAGE_NAMESPACE, NVS_READWRITE, &nvs));
-
-    uint8_t read_val;
-    err = nvs_get_u8(nvs, "tamper", &read_val);
-    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) {
-        ESP_ERROR_CHECK(err);
-    }
-
-    ESP_ERROR_CHECK(nvs_set_u8(nvs, "tamper", val));
-    ESP_ERROR_CHECK(nvs_commit(nvs));
-    nvs_close(nvs);
-}*/
 
 static const char tamper_msg[] =
 "Tampering has been detected. COOLTUNA security protocols enforced.\n"
 "All commands have been disabled except: factory_reset\n\n"
 "Please restore product packaging to its original condition and\n"
 "use this command to re-authenticate with the server!\n";
-
-/*
-
-static void tamper_detected() {
-    tamper_detected = 1; // TODO NVS
-    ESP_LOGE(TAG, tamper_msg);
-    tamper_notified = 1;
-}
-
-*/
-
 
 // Task handling digital sensor notifications from ISRs
 static void sensor_handler_digi(void *arg) {

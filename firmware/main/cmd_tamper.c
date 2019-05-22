@@ -2,9 +2,6 @@
 #include "cmd_tamper.h"
 #include "common.h"
 
-//uint8_t get_tamper_nvs();
-//void set_tamper_nvs(uint8_t val);
-
 uint8_t get_tamper_nvs(){
     nvs_handle nvs;
     esp_err_t err;
