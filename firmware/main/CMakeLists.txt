@@ -1,5 +1,5 @@
 set(COMPONENT_SRCS "shell.c"
-                   "cmd_wifi.c"
+                   "wifi.c"
                    "main.c"
                    "tamper.c"
                    "http_client.c")

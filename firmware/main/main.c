@@ -29,7 +29,7 @@
 
 #include <driver/adc.h>
 
-#include "cmd_wifi.c"
+#include "wifi.c"
 #include "shell.c"
 #include "common.h"
 #include "tamper.h"
@@ -303,8 +303,6 @@ void app_main() {
     /////////////////////////////////////////////////
     // Tamper sensor pin setup
 
-    //tamper_detected = get_tamper_nvs();
-
     gpio_config_t io_conf;
     io_conf.intr_type = GPIO_PIN_INTR_POSEDGE;
     io_conf.mode = GPIO_MODE_INPUT;
@@ -332,7 +330,6 @@ void app_main() {
 #if !PROD
         ESP_LOGW(TAG, "[DEV] On-Boot Tamper Detected");
 #endif
-        //tamper_detected=1;
         set_tamper_nvs(1);
         tamper_notified=1;
         ESP_LOGE(TAG, "%s", tamper_msg);
