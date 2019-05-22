@@ -287,7 +287,7 @@ void app_main() {
 
     // TODO prod values
     // Join game WIFI network
-    if (!wifi_join("NSL","1qaz2wsx3edc", 10)) {
+    if (!wifi_join("interceptctfnet2","9w38ruaowfuaw86sty3", 10)) {
         ESP_LOGE(TAG, "Can't connect to game network - restarting in 10 seconds!");
 #if PROD
         uint8_t i = 0;
