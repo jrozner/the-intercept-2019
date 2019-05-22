@@ -17,6 +17,8 @@
 #include "esp_http_client.h" // http requests
 #include "hwcrypto/aes.h" // aes crypto module
 
+#define HOST "http://10.0.10.111:8080"
+
 static const char* TAG = "cmd_system";
 
 static char serial[12];
@@ -100,10 +102,10 @@ static void register_register_team() {
 }
 
 static int register_team(int argc, char **argv) {
-    char *url, *post_data;
+    char *post_data;
+    char *url = HOST "/register";
     esp_err_t err;
 
-    asprintf(&url, "%s/register", "http://192.168.1.215:8080");
     asprintf(&post_data, "serial=%s&team_name=%s", serial, argv[1]);
 
     esp_http_client_config_t config = {
@@ -127,7 +129,6 @@ static int register_team(int argc, char **argv) {
     if (content_length == ESP_FAIL || content_length == 0) {
         ESP_LOGE(TAG, "no length or chunked");
         esp_http_client_cleanup(client);
-        free(url);
         free(post_data);
         return ESP_FAIL;
     }
@@ -136,7 +137,6 @@ static int register_team(int argc, char **argv) {
     if (buffer == NULL) {
         ESP_LOGE(TAG, "unable to allocate space for buffer");
         esp_http_client_cleanup(client);
-        free(url);
         free(post_data);
         return ESP_FAIL;
     }
@@ -147,11 +147,12 @@ static int register_team(int argc, char **argv) {
     if (read_len < total_read) {
         esp_http_client_cleanup(client);
         free(buffer);
-        free(url);
         free(post_data);
         return ESP_FAIL;
     }
 
+    free(buffer);
+    free(post_data);
     return ESP_OK;
 }
 
