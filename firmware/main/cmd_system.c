@@ -1,13 +1,14 @@
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
+#include <cJSON.h>
+#include <nvs.h>
 #include "esp_log.h"
 #include "esp_console.h"
 #include "esp_system.h"
 #include "esp_sleep.h"
 #include "driver/rtc_io.h"
 #include "argtable3/argtable3.h"
-#include "cmd_decl.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "soc/rtc_cntl_reg.h"
@@ -19,7 +20,7 @@
 
 #include "cmd_tamper.h"
 
-#define HOST "http://10.0.10.111:8080"
+#define HOST "http://192.168.1.215:8080"
 
 static const char* TAG = "cmd_system";
 
@@ -27,19 +28,24 @@ static char serial[12];
 
 // command console registration functions
 static void register_factory_reset();
-static void register_get_contacts();
 static void register_restart();
 static int register_tuna_jokes();
 static void register_hidden_cmd();
 static void register_register_team();
+static void register_unread();
+static void register_contacts();
+static void register_read_message();
+static void register_compose();
 
 // command functions
 static int register_team(int argc, char **argv);
-static int factory_reset();
-static int get_contacts();
+static int unread(int argc, char **argv);
+static int read_message(int argc, char **argv);
+static int factory_reset(int argc, char **argv);
+static int contacts(int argc, char **argv);
 static int restart(int argc, char** argv);
-static int tuna_jokes();
-static int hidden_cmd(); //flag
+static int tuna_jokes(int argc, char **argv);
+static int hidden_cmd(int argc, char **argv); //flag
 static __attribute__((used)) int unregistered_cmd(); //flag
 
 // HTTP request event handler
@@ -75,8 +81,10 @@ void register_system() {
     esp_console_register_help_command();
     register_register_team();
 	register_factory_reset();
-	register_get_contacts();
-	//register_get_messages();
+	register_unread();
+	register_contacts();
+	register_read_message();
+	register_compose();
 	register_restart();
     register_hidden_cmd();
     if(register_tuna_jokes() == 10) { // used to ensure a reference to unregistred_cmd because I suck at GCC apparently
@@ -94,13 +102,14 @@ static void register_register_team() {
     register_arguments.end = arg_end(1);
 
     esp_console_cmd_t cmd = {
-            .command = "register",
-            .help = "Register a new device",
-            .hint = NULL,
-            .func = &register_team,
-            .argtable = &register_arguments,
+        .command = "register",
+        .help = "Register a new device",
+        .hint = NULL,
+        .func = &register_team,
+        .argtable = &register_arguments,
     };
-    ESP_ERROR_CHECK( esp_console_cmd_register(&cmd) );
+
+    ESP_ERROR_CHECK(esp_console_cmd_register(&cmd));
 }
 
 static int register_team(int argc, char **argv) {
@@ -111,8 +120,8 @@ static int register_team(int argc, char **argv) {
     asprintf(&post_data, "serial=%s&team_name=%s", serial, argv[1]);
 
     esp_http_client_config_t config = {
-            .url = url,
-            .event_handler = _http_event_handle,
+        .url = url,
+        .event_handler = _http_event_handle,
     };
     esp_http_client_handle_t client = esp_http_client_init(&config);
 
@@ -153,38 +162,57 @@ static int register_team(int argc, char **argv) {
         return ESP_FAIL;
     }
 
+    cJSON *root = cJSON_Parse(buffer);
+
+    nvs_handle nvs;
+    // TODO: update storage
+    ESP_ERROR_CHECK(nvs_open("storage", NVS_READWRITE, &nvs));
+
+    char *access_key = cJSON_GetObjectItem(root,"access_key")->string;
+    ESP_ERROR_CHECK(nvs_set_str(nvs, "access_key", access_key));
+
+    char *secret_key = cJSON_GetObjectItem(root,"access_key")->string;
+    ESP_ERROR_CHECK(nvs_set_str(nvs, "access_key", secret_key));
+
+    ESP_ERROR_CHECK(nvs_commit(nvs));
+
+    nvs_close(nvs);
+    cJSON_free(root);
+
     free(buffer);
     free(post_data);
+
     return ESP_OK;
 }
 
 static void register_factory_reset() {
-	// key reset
 	esp_console_cmd_t cmd = {
 	    .command = "factory_reset",
 	    .help = "Perform a factory reset; this is required when tampering is detected",
 	    .hint = NULL,
 	    .func = &factory_reset,
 	};
-	ESP_ERROR_CHECK( esp_console_cmd_register(&cmd) );
+
+	ESP_ERROR_CHECK(esp_console_cmd_register(&cmd));
 }
 
-int factory_reset() {
+static int factory_reset(int argc, char **argv) {
     set_tamper_nvs(0);
     return ESP_OK;
 }
 
-static void register_get_contacts() {
+static void register_contacts() {
 	esp_console_cmd_t cmd = {
 		.command = "contacts",
 		.help = "List contact book",
 		.hint = NULL,
-		.func = &get_contacts,
+		.func = &contacts,
 	};
-	ESP_ERROR_CHECK( esp_console_cmd_register(&cmd) );
+
+	ESP_ERROR_CHECK(esp_console_cmd_register(&cmd));
 }
 
-static int get_contacts() {
+static int contacts(int argc, char **argv) {
 	//esp_http_client_config_t config = {
 	//   .url = "http://10.0.20.114:8080/contacts",
 	//   .event_handler = _http_event_handle,
@@ -200,7 +228,7 @@ static int get_contacts() {
 
     // TODO parse data - must handle in event handler? unsure
 
-	return 0;
+	return ESP_OK;
 }
 
 static int register_tuna_jokes() {
@@ -210,11 +238,13 @@ static int register_tuna_jokes() {
         .hint = NULL,
         .func = &tuna_jokes,
     };
-    ESP_ERROR_CHECK( esp_console_cmd_register(&cmd) );
-    return 0;
+
+    ESP_ERROR_CHECK(esp_console_cmd_register(&cmd));
+
+    return ESP_OK;
 }
 
-static int tuna_jokes() {
+static int tuna_jokes(int argc, char **argv) {
     static const char *jokes[] = {
         "What do you call a fish that needs help with his or her vocals?\n\nAutotuna.\n",
         "What game do fish like playing the most?\n\nName that tuna!\n",
@@ -229,7 +259,7 @@ static int tuna_jokes() {
 
     printf(jokes[xTaskGetTickCount()&7]);
 
-    return 0;
+    return ESP_OK;
 }
 
 static void register_hidden_cmd() {
@@ -239,11 +269,11 @@ static void register_hidden_cmd() {
         .hint = NULL,
         .func = &hidden_cmd,
     };
-    ESP_ERROR_CHECK( esp_console_cmd_register(&cmd) );
 
+    ESP_ERROR_CHECK(esp_console_cmd_register(&cmd));
 }
 
-static int hidden_cmd() {
+static int hidden_cmd(int argc, char **argv) {
     // hidden command flag{findThemFISHJokeZ}
     static char b[] = "g{f";
     static char f[] = "Joke";
@@ -256,7 +286,7 @@ static int hidden_cmd() {
     printf("I'm off the hook.\n\n");
     printf("%s%s%sT%s%sH%sZ}\n",a,b,c,d,e,f);
 
-    return 0;
+    return ESP_OK;
 }
 
 static int unregistered_cmd() {
@@ -265,7 +295,8 @@ static int unregistered_cmd() {
     // flag{hiddenAmongTHEReeds}
     volatile const char sea_urchin[] = "hlned{AngadgsdeT}meEoifRH";
     printf("%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c\n", sea_urchin[22],sea_urchin[1],sea_urchin[9],sea_urchin[8],sea_urchin[5],sea_urchin[0],sea_urchin[21],sea_urchin[13],sea_urchin[4],sea_urchin[18],sea_urchin[2],sea_urchin[6],sea_urchin[17],sea_urchin[20],sea_urchin[7],sea_urchin[11],sea_urchin[15],sea_urchin[24],sea_urchin[19],sea_urchin[23],sea_urchin[14],sea_urchin[3],sea_urchin[10],sea_urchin[12],sea_urchin[16]);
-    return 0;
+
+    return ESP_OK;
 }
 
 static int restart(int argc, char** argv) {
@@ -276,11 +307,77 @@ static int restart(int argc, char** argv) {
 static void register_restart() {
     const esp_console_cmd_t cmd = {
         .command = "restart",
-        .help = "Restart the program",
+        .help = "Restart the device",
         .hint = NULL,
         .func = &restart,
     };
-    ESP_ERROR_CHECK( esp_console_cmd_register(&cmd) );
+
+    ESP_ERROR_CHECK(esp_console_cmd_register(&cmd));
+}
+
+static int unread(int argc, char **argv) {
+    return ESP_OK;
+}
+
+static void register_unread() {
+    const esp_console_cmd_t cmd = {
+        .command = "unread",
+        .help = "List unread messages",
+        .hint = NULL,
+        .func = &unread,
+    };
+
+    ESP_ERROR_CHECK(esp_console_cmd_register(&cmd));
+}
+
+static struct {
+    struct arg_int *id;
+    struct arg_end *end;
+} read_message_arguments;
+
+
+static int read_message(int argc, char **argv) {
+    return ESP_OK;
+}
+
+static void register_read_message() {
+    read_message_arguments.id = arg_int1(NULL, NULL, "<id>", "id of message");
+    read_message_arguments.end = arg_end(1);
+    const esp_console_cmd_t cmd = {
+        .command = "read",
+        .help = "Read a message",
+        .hint = NULL,
+        .func = &read_message,
+        .argtable = &read_message_arguments,
+    };
+
+    ESP_ERROR_CHECK(esp_console_cmd_register(&cmd));
+}
+
+static struct {
+    struct arg_str *recipient;
+    struct arg_str *message;
+    struct arg_end *end;
+} compose_arguments;
+
+
+static int compose(int argc, char **argv) {
+    return ESP_OK;
+}
+
+static void register_compose() {
+    compose_arguments.recipient = arg_str1(NULL, NULL, "<recipient>", "recipient of the message");
+    compose_arguments.message = arg_str1(NULL, NULL, "<message>", "message to send");
+    compose_arguments.end = arg_end(2);
+    const esp_console_cmd_t cmd = {
+        .command = "compose",
+        .help = "Compose a message",
+        .hint = NULL,
+        .func = &compose,
+        .argtable = &compose_arguments,
+    };
+
+    ESP_ERROR_CHECK(esp_console_cmd_register(&cmd));
 }
 
 // unreferenced function set "used" to store unferenced string data for various challenges
@@ -290,5 +387,6 @@ static int placeholder() {
     printf(hiddentuna);
     const char ver[] = "COOLTUNA v1.34.5.1.2";
     printf(ver);
-    return 0;
+
+    return ESP_OK;
 }
