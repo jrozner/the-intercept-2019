@@ -280,7 +280,6 @@ void app_main() {
     initialize_console();
 
     // register console command handlers
-    esp_console_register_help_command();
     register_system();
     #if !PROD
         register_wifi(); // register wifi command handlers (debug build only)
