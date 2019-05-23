@@ -382,14 +382,46 @@ static void register_admin_login() {
 
 static int admin_login(int argc, char **argv) {
     if (get_tamper_nvs()) {
-        ESP_LOGE(TAG, tamper_msg);
+        //ESP_LOGE(TAG, tamper_msg);
+        printf(tamper_msg);
     } else {
         if (admin_state != 1) { // check if already admin
             if (argv[1] != NULL) {
                 // do check
-                admin_state = 1;
-                register_admin_read();
-                register_admin_jump();
+                const char aa[] = "\x60\x6a\x7f\x75\xa3\x4f\x07\xb3\xb2"; // enc 1
+                const char bb[] = "\x53\x7c\x25\xed\x5b\x9d\x95\x06\x17"; // enc 2
+                const char cc[] = "\x2b\x23\x31\x32\xcc\x29\x73\xfb\xd7"; // key 1
+                const char dd[] = "\x1e\x3d\x66\xa6\x1e\xcf\xd0\x4a\x64"; // key 2
+                char ee[20]; // output buf
+                memset(&ee, 0, 20);
+                uint8_t i;
+                for (i=0; i<9; i++) {// reassemble plaintext password
+                    ee[i] = aa[i] ^ cc[i];
+                    ee[i+9] = bb[i] ^ dd[i];
+                }
+
+                const TickType_t delay_ms = 50/portTICK_PERIOD_MS;
+
+                if (strlen(argv[1]) == 18) {
+                    bool allowed = true;
+                    for (i=0; i<18; i++) {
+                        if (ee[i] != argv[1][i]) {
+                            allowed=false;
+                            break;
+                        }
+                        vTaskDelay(delay_ms); // Force delay for timing attack vuln
+                    }
+                    if (allowed) {
+                        admin_state = 1;
+                        register_admin_read();
+                        register_admin_jump();
+                        printf("Access granted.\nHello, Administrator!\nPlease check 'help' for administrative help.\n");
+                        return ESP_OK;
+                    }
+                }
+                printf("Access denied.\n");
+            } else {
+                printf("Please specify a password!\n");
             }
         } else {
             printf("You're already an admin, you silly salmon.\n");
@@ -419,7 +451,8 @@ static void register_admin_read() {
 
 static int admin_read(int argc, char **argv) {
     if (get_tamper_nvs()) {
-        ESP_LOGE(TAG, tamper_msg);
+        //ESP_LOGE(TAG, tamper_msg);
+        printf(tamper_msg);
     } else {
         if (admin_state) {
             if (argv[1] != NULL) {
@@ -453,7 +486,8 @@ static void register_admin_jump() {
 
 static int admin_jump(int argc, char **argv) {
     if (get_tamper_nvs()) {
-        ESP_LOGE(TAG, tamper_msg);
+        //ESP_LOGE(TAG, tamper_msg);
+        printf(tamper_msg);
     } else {
         if (admin_state) {
             if (argv[1] != NULL) {
