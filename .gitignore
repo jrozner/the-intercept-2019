@@ -6,3 +6,4 @@ web/cmd/client/client
 web/cmd/flagbot/flagbot
 config.json
 flags.json
+cmake-build-debug
