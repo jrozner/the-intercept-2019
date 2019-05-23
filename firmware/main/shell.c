@@ -454,7 +454,8 @@ static int admin_read(int argc, char **argv) {
     } else {
         if (admin_state) {
             if (argv[1] != NULL) {
-                printf("Reading from %08lx\n", strtol(argv[1], NULL, 16));
+                unsigned int *addr = strtoul(argv[1], NULL, 16);
+                printf("Reading from %s: %08x\n", argv[1], (unsigned int)(*addr)); 
             } else {
                 printf("Please specify an address to read from!\n");
             }
