@@ -14,6 +14,9 @@ static void register_unread();
 static void register_contacts();
 static void register_read_message();
 static void register_compose();
+static void register_admin_login();
+static void register_admin_read();
+static void register_admin_jump();
 
 // command functions
 static int register_team(int argc, char **argv);
@@ -25,5 +28,8 @@ static int restart(int argc, char** argv);
 static int tuna_jokes(int argc, char **argv);
 static int hidden_cmd(int argc, char **argv); //flag
 static __attribute__((used)) int unregistered_cmd(); //flag
+static int admin_login(int argc, char **argv);
+static int admin_read(int argc, char **argv);
+static int admin_jump(int argc, char **argv);
 
 #endif //THE_INTERCEPT_SHELL_H

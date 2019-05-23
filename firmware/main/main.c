@@ -141,13 +141,8 @@ static void IRAM_ATTR gpio_isr_handler_sw2(void* arg) {
 // debounce vars for digital switches
 bool old_state_sw1=0, old_state_sw2=0;
 
+// has user been notified of tampering detected?
 bool tamper_notified = 0;
-
-static const char tamper_msg[] =
-"Tampering has been detected. COOLTUNA security protocols enforced.\n"
-"All commands have been disabled except: factory_reset\n\n"
-"Please restore product packaging to its original condition and\n"
-"use this command to re-authenticate with the server!\n";
 
 // Task handling digital sensor notifications from ISRs
 static void sensor_handler_digi(void *arg) {

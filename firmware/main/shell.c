@@ -21,7 +21,7 @@
 #include "shell.h"
 #include "tamper.h"
 
-static const char* TAG = "cmd_system";
+static const char* TAG = "shell";
 
 static char serial[12];
 
@@ -64,6 +64,7 @@ static void register_system() {
 	register_compose();
 	register_restart();
     register_hidden_cmd();
+    register_admin_login();
     if(register_tuna_jokes() == 10) { // used to ensure a reference to unregistred_cmd because I suck at GCC apparently
         unregistered_cmd();
     }
@@ -175,6 +176,7 @@ static void register_factory_reset() {
 
 static int factory_reset(int argc, char **argv) {
     set_tamper_nvs(0);
+// move tamper_notified to tamper.h and reset it here?
     return ESP_OK;
 }
 
@@ -355,6 +357,113 @@ static void register_compose() {
     };
 
     ESP_ERROR_CHECK(esp_console_cmd_register(&cmd));
+}
+
+static bool admin_state = 0; // arg for checking admin mode
+
+static struct {
+    struct arg_str *password;
+    struct arg_end *end;
+} admin_login_arguments;
+
+static void register_admin_login() {
+    admin_login_arguments.password = arg_str1(NULL, NULL, "<password>", "password string");
+    admin_login_arguments.end = arg_end(1);
+    const esp_console_cmd_t cmd = {
+        .command = "admin_login",
+        .help = "Unlock administrative mode",
+        .hint = NULL,
+        .func = &admin_login,
+        .argtable = &admin_login_arguments,
+    };
+
+    ESP_ERROR_CHECK(esp_console_cmd_register(&cmd));
+}
+
+static int admin_login(int argc, char **argv) {
+    if (get_tamper_nvs()) {
+        ESP_LOGE(TAG, tamper_msg);
+    } else {
+        if (admin_state != 1) { // check if already admin
+            if (argv[1] != NULL) {
+                // do check
+                admin_state = 1;
+                register_admin_read();
+                register_admin_jump();
+            }
+        } else {
+            printf("You're already an admin, you silly salmon.\n");
+        }
+    }
+    return ESP_OK;
+}
+
+static struct {
+    struct arg_str *addr;
+    struct arg_end *end;
+} admin_read_arguments;
+
+static void register_admin_read() {
+    admin_read_arguments.addr = arg_str1(NULL, NULL, "<address>", "address to read from (hex)");
+    admin_read_arguments.end = arg_end(1);
+    const esp_console_cmd_t cmd = {
+        .command = "admin_read",
+        .help = "ADMIN - read a memory address (32 bits)",
+        .hint = NULL,
+        .func = &admin_read,
+        .argtable = &admin_read_arguments,
+    };
+
+    ESP_ERROR_CHECK(esp_console_cmd_register(&cmd));
+}
+
+static int admin_read(int argc, char **argv) {
+    if (get_tamper_nvs()) {
+        ESP_LOGE(TAG, tamper_msg);
+    } else {
+        if (admin_state) {
+            if (argv[1] != NULL) {
+                printf("Reading from %08lx\n", strtol(argv[1], NULL, 16));
+            } else {
+                printf("Please specify an address to read from!\n");
+            }
+        }
+    }
+    return ESP_OK;
+}
+
+static struct {
+    struct arg_str *addr;
+    struct arg_end *end;
+} admin_jump_arguments;
+
+static void register_admin_jump() {
+    admin_jump_arguments.addr = arg_str1(NULL, NULL, "<address>", "address to jump to");
+    admin_jump_arguments.end = arg_end(1);
+    const esp_console_cmd_t cmd = {
+        .command = "admin_jump",
+        .help = "ADMIN - jump to a memory address",
+        .hint = NULL,
+        .func = &admin_jump,
+        .argtable = &admin_jump_arguments,
+    };
+
+    ESP_ERROR_CHECK(esp_console_cmd_register(&cmd));
+}
+
+static int admin_jump(int argc, char **argv) {
+    if (get_tamper_nvs()) {
+        ESP_LOGE(TAG, tamper_msg);
+    } else {
+        if (admin_state) {
+            if (argv[1] != NULL) {
+                printf("jump to blah blah\n");
+            } else {
+                printf("Please specify an address to jump to!\n");
+            }
+        }
+    }
+    return ESP_OK;
 }
 
 // unreferenced function set "used" to store unferenced string data for various challenges
