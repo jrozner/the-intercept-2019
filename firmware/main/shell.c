@@ -382,8 +382,7 @@ static void register_admin_login() {
 
 static int admin_login(int argc, char **argv) {
     if (get_tamper_nvs()) {
-        //ESP_LOGE(TAG, tamper_msg);
-        printf(tamper_msg);
+        ESP_LOGE(TAG, "%s", tamper_msg);
     } else {
         if (admin_state != 1) { // check if already admin
             if (argv[1] != NULL) {
@@ -451,8 +450,7 @@ static void register_admin_read() {
 
 static int admin_read(int argc, char **argv) {
     if (get_tamper_nvs()) {
-        //ESP_LOGE(TAG, tamper_msg);
-        printf(tamper_msg);
+        ESP_LOGE(TAG, "%s", tamper_msg);
     } else {
         if (admin_state) {
             if (argv[1] != NULL) {
@@ -471,7 +469,7 @@ static struct {
 } admin_jump_arguments;
 
 static void register_admin_jump() {
-    admin_jump_arguments.addr = arg_str1(NULL, NULL, "<address>", "address to jump to");
+    admin_jump_arguments.addr = arg_str1(NULL, NULL, "<address>", "address to jump to (hex)");
     admin_jump_arguments.end = arg_end(1);
     const esp_console_cmd_t cmd = {
         .command = "admin_jump",
@@ -486,12 +484,15 @@ static void register_admin_jump() {
 
 static int admin_jump(int argc, char **argv) {
     if (get_tamper_nvs()) {
-        //ESP_LOGE(TAG, tamper_msg);
-        printf(tamper_msg);
+        ESP_LOGE(TAG, "%s", tamper_msg);
     } else {
         if (admin_state) {
             if (argv[1] != NULL) {
-                printf("jump to blah blah\n");
+                printf("Prepare for dive!\n");
+                int addr = strtoul(argv[1], NULL, 16);
+                int (*func)();
+                func = (int (*)())addr;
+                (int)(*func)();
             } else {
                 printf("Please specify an address to jump to!\n");
             }
