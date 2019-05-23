@@ -13,17 +13,17 @@
 #include "freertos/task.h"
 #include "soc/rtc_cntl_reg.h"
 #include "sdkconfig.h"
-#include "esp_http_client.h"
 
 #include "esp_http_client.h" // http requests
 #include "hwcrypto/aes.h" // aes crypto module
 
 #include "shell.h"
 #include "tamper.h"
+#include "util.h"
+#include "common.h"
+#include "http.h"
 
 static const char* TAG = "shell";
-
-static char serial[12];
 
 // HTTP request event handler
 esp_err_t _http_event_handle(esp_http_client_event_t *evt) {
@@ -35,13 +35,8 @@ esp_err_t _http_event_handle(esp_http_client_event_t *evt) {
         case HTTP_EVENT_HEADER_SENT:
             break;
         case HTTP_EVENT_ON_HEADER:
-            printf("%.*s", evt->data_len, (char*)evt->data);
             break;
         case HTTP_EVENT_ON_DATA:
-            if (!esp_http_client_is_chunked_response(evt->client)) {
-                printf("%.*s", evt->data_len, (char*)evt->data);
-            }
-
             break;
         case HTTP_EVENT_ON_FINISH:
             break;
@@ -54,7 +49,7 @@ esp_err_t _http_event_handle(esp_http_client_event_t *evt) {
 }
 
 // Register all command handlers (besides wifi)
-static void register_system() {
+void register_system() {
     esp_console_register_help_command();
     register_register_team();
 	register_factory_reset();
@@ -75,7 +70,7 @@ static struct {
     struct arg_end *end;
 } register_arguments;
 
-static void register_register_team() {
+void register_register_team() {
     register_arguments.team_name = arg_str1(NULL, NULL, "<team name>", "name of team");
     register_arguments.end = arg_end(1);
 
@@ -90,12 +85,13 @@ static void register_register_team() {
     ESP_ERROR_CHECK(esp_console_cmd_register(&cmd));
 }
 
-static int register_team(int argc, char **argv) {
+int register_team(int argc, char **argv) {
     char *post_data;
     char *url = HOST "/register";
-    esp_err_t err;
+    size_t body_len;
 
     asprintf(&post_data, "serial=%s&team_name=%s", serial, argv[1]);
+    body_len = strlen(post_data);
 
     esp_http_client_config_t config = {
         .url = url,
@@ -104,19 +100,30 @@ static int register_team(int argc, char **argv) {
     esp_http_client_handle_t client = esp_http_client_init(&config);
 
     esp_http_client_set_method(client, HTTP_METHOD_POST);
-    esp_http_client_set_post_field(client, post_data, strlen(post_data));
-    err = esp_http_client_perform(client);
-    if (err == ESP_OK) {
-        ESP_LOGI(TAG, "HTTP POST Status = %d, content_length = %d",
-                 esp_http_client_get_status_code(client),
-                 esp_http_client_get_content_length(client));
-    } else {
-        ESP_LOGE(TAG, "HTTP POST request failed: %s", esp_err_to_name(err));
+
+    if (esp_http_client_open(client, strlen(post_data)) != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to open HTTP connection");
+        free(post_data);
+        return ESP_FAIL;
+    }
+
+    if (esp_http_client_write(client, post_data, body_len) <= 0) {
+        ESP_LOGE(TAG, "Failed to write post body");
+        free(post_data);
+        esp_http_client_cleanup(client);
+        return ESP_FAIL;
     }
 
     int content_length = esp_http_client_fetch_headers(client);
     if (content_length == ESP_FAIL || content_length == 0) {
         ESP_LOGE(TAG, "no length or chunked");
+        esp_http_client_cleanup(client);
+        free(post_data);
+        return ESP_FAIL;
+    }
+
+    if (esp_http_client_get_status_code(client) != 200) {
+        ESP_LOGE(TAG, "did not return a 200 status");
         esp_http_client_cleanup(client);
         free(post_data);
         return ESP_FAIL;
@@ -143,27 +150,38 @@ static int register_team(int argc, char **argv) {
     cJSON *root = cJSON_Parse(buffer);
 
     nvs_handle nvs;
-    // TODO: update storage
-    ESP_ERROR_CHECK(nvs_open("storage", NVS_READWRITE, &nvs));
+    ESP_ERROR_CHECK(nvs_open(STORAGE_NAMESPACE, NVS_READWRITE, &nvs));
 
-    char *access_key = cJSON_GetObjectItem(root,"access_key")->string;
-    ESP_ERROR_CHECK(nvs_set_str(nvs, "access_key", access_key));
+    char *ak = cJSON_GetObjectItem(root,"access_key")->valuestring;
+    ESP_ERROR_CHECK(set_access_key(ak));
 
-    char *secret_key = cJSON_GetObjectItem(root,"access_key")->string;
-    ESP_ERROR_CHECK(nvs_set_str(nvs, "access_key", secret_key));
+    char *sk = cJSON_GetObjectItem(root,"secret_key")->valuestring;
+    uint8_t *decoded;
+    if ((decoded = hex_decode(sk)) == NULL) {
+        ESP_LOGE(TAG, "Failed to decode secret key");
+        nvs_close(nvs);
+        cJSON_free(root);
+        esp_http_client_cleanup(client);
+        free(post_data);
+        return ESP_FAIL;
+    }
+
+    ESP_ERROR_CHECK(set_secret_key(decoded, strlen(sk)/2));
 
     ESP_ERROR_CHECK(nvs_commit(nvs));
 
     nvs_close(nvs);
     cJSON_free(root);
 
+    esp_http_client_cleanup(client);
+    free(decoded);
     free(buffer);
     free(post_data);
 
     return ESP_OK;
 }
 
-static void register_factory_reset() {
+void register_factory_reset() {
 	esp_console_cmd_t cmd = {
 	    .command = "factory_reset",
 	    .help = "Perform a factory reset; this is required when tampering is detected",
@@ -174,13 +192,13 @@ static void register_factory_reset() {
 	ESP_ERROR_CHECK(esp_console_cmd_register(&cmd));
 }
 
-static int factory_reset(int argc, char **argv) {
+int factory_reset(int argc, char **argv) {
     set_tamper_nvs(0);
 // move tamper_notified to tamper.h and reset it here?
     return ESP_OK;
 }
 
-static void register_contacts() {
+void register_contacts() {
 	esp_console_cmd_t cmd = {
 		.command = "contacts",
 		.help = "List contact book",
@@ -191,7 +209,7 @@ static void register_contacts() {
 	ESP_ERROR_CHECK(esp_console_cmd_register(&cmd));
 }
 
-static int contacts(int argc, char **argv) {
+int contacts(int argc, char **argv) {
 	//esp_http_client_config_t config = {
 	//   .url = "http://10.0.20.114:8080/contacts",
 	//   .event_handler = _http_event_handle,
@@ -210,7 +228,7 @@ static int contacts(int argc, char **argv) {
 	return ESP_OK;
 }
 
-static int register_tuna_jokes() {
+int register_tuna_jokes() {
         esp_console_cmd_t cmd = {
         .command = "tuna_jokes",
         .help = "Ask for a joke, get a joke",
@@ -223,7 +241,7 @@ static int register_tuna_jokes() {
     return ESP_OK;
 }
 
-static int tuna_jokes(int argc, char **argv) {
+int tuna_jokes(int argc, char **argv) {
     static const char *jokes[] = {
         "What do you call a fish that needs help with his or her vocals?\n\nAutotuna.\n",
         "What game do fish like playing the most?\n\nName that tuna!\n",
@@ -241,7 +259,7 @@ static int tuna_jokes(int argc, char **argv) {
     return ESP_OK;
 }
 
-static void register_hidden_cmd() {
+void register_hidden_cmd() {
     esp_console_cmd_t cmd = {
         .command = "tuna_jokeZ",
         .help = NULL,
@@ -252,7 +270,7 @@ static void register_hidden_cmd() {
     ESP_ERROR_CHECK(esp_console_cmd_register(&cmd));
 }
 
-static int hidden_cmd(int argc, char **argv) {
+int hidden_cmd(int argc, char **argv) {
     // hidden command flag{findThemFISHJokeZ}
     static char b[] = "g{f";
     static char f[] = "Joke";
@@ -268,7 +286,7 @@ static int hidden_cmd(int argc, char **argv) {
     return ESP_OK;
 }
 
-static int unregistered_cmd() {
+int unregistered_cmd() {
     // unregistered command
     // find by reversing or some magical hax to jump to it
     // flag{hiddenAmongTHEReeds}
@@ -278,12 +296,12 @@ static int unregistered_cmd() {
     return ESP_OK;
 }
 
-static int restart(int argc, char** argv) {
+int restart(int argc, char** argv) {
     ESP_LOGI(__func__, "Restarting");
     esp_restart();
 }
 
-static void register_restart() {
+void register_restart() {
     const esp_console_cmd_t cmd = {
         .command = "restart",
         .help = "Restart the device",
@@ -294,11 +312,71 @@ static void register_restart() {
     ESP_ERROR_CHECK(esp_console_cmd_register(&cmd));
 }
 
-static int unread(int argc, char **argv) {
+int unread(int argc, char **argv) {
+    char *url = HOST "/messages";
+
+    esp_http_client_config_t config = {
+            .url = url,
+            .event_handler = _http_event_handle,
+    };
+    esp_http_client_handle_t client = esp_http_client_init(&config);
+
+    esp_http_client_set_method(client, HTTP_METHOD_GET);
+
+    if (esp_http_client_open(client, 0) != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to open HTTP connection");
+        return ESP_FAIL;
+    }
+
+    int content_length = esp_http_client_fetch_headers(client);
+    if (content_length == ESP_FAIL || content_length == 0) {
+        ESP_LOGE(TAG, "no length or chunked");
+        esp_http_client_cleanup(client);
+        return ESP_FAIL;
+    }
+
+    if (esp_http_client_get_status_code(client) != 200) {
+        ESP_LOGE(TAG, "did not return a 200 status");
+        esp_http_client_cleanup(client);
+        return ESP_FAIL;
+    }
+
+    char *buffer = malloc(content_length+1);
+    if (buffer == NULL) {
+        ESP_LOGE(TAG, "unable to allocate space for buffer");
+        esp_http_client_cleanup(client);
+        return ESP_FAIL;
+    }
+
+    int total_read = 0, read_len = 0;
+    read_len = esp_http_client_read(client, buffer, content_length);
+
+    if (read_len < total_read) {
+        esp_http_client_cleanup(client);
+        free(buffer);
+        return ESP_FAIL;
+    }
+
+    nvs_handle nvs;
+    ESP_ERROR_CHECK(nvs_open(STORAGE_NAMESPACE, NVS_READWRITE, &nvs));
+
+    printf("Unread Messages:");
+
+    cJSON *messages = cJSON_Parse(buffer), *message;
+
+    cJSON_ArrayForEach(message, messages) {
+        char *text = cJSON_GetObjectItem(message,"text")->valuestring;
+    }
+
+    cJSON_free(messages);
+
+    esp_http_client_cleanup(client);
+    free(buffer);
+
     return ESP_OK;
 }
 
-static void register_unread() {
+void register_unread() {
     const esp_console_cmd_t cmd = {
         .command = "unread",
         .help = "List unread messages",
@@ -315,11 +393,11 @@ static struct {
 } read_message_arguments;
 
 
-static int read_message(int argc, char **argv) {
+int read_message(int argc, char **argv) {
     return ESP_OK;
 }
 
-static void register_read_message() {
+void register_read_message() {
     read_message_arguments.id = arg_int1(NULL, NULL, "<id>", "id of message");
     read_message_arguments.end = arg_end(1);
     const esp_console_cmd_t cmd = {
@@ -340,11 +418,11 @@ static struct {
 } compose_arguments;
 
 
-static int compose(int argc, char **argv) {
+int compose(int argc, char **argv) {
     return ESP_OK;
 }
 
-static void register_compose() {
+void register_compose() {
     compose_arguments.recipient = arg_str1(NULL, NULL, "<recipient>", "recipient of the message");
     compose_arguments.message = arg_str1(NULL, NULL, "<message>", "message to send");
     compose_arguments.end = arg_end(2);
@@ -366,7 +444,7 @@ static struct {
     struct arg_end *end;
 } admin_login_arguments;
 
-static void register_admin_login() {
+void register_admin_login() {
     admin_login_arguments.password = arg_str1(NULL, NULL, "<password>", "password string");
     admin_login_arguments.end = arg_end(1);
     const esp_console_cmd_t cmd = {
@@ -380,7 +458,7 @@ static void register_admin_login() {
     ESP_ERROR_CHECK(esp_console_cmd_register(&cmd));
 }
 
-static int admin_login(int argc, char **argv) {
+int admin_login(int argc, char **argv) {
     if (get_tamper_nvs()) {
         ESP_LOGE(TAG, "%s", tamper_msg);
     } else {
@@ -434,7 +512,7 @@ static struct {
     struct arg_end *end;
 } admin_read_arguments;
 
-static void register_admin_read() {
+void register_admin_read() {
     admin_read_arguments.addr = arg_str1(NULL, NULL, "<address>", "address to read from (hex)");
     admin_read_arguments.end = arg_end(1);
     const esp_console_cmd_t cmd = {
@@ -448,7 +526,7 @@ static void register_admin_read() {
     ESP_ERROR_CHECK(esp_console_cmd_register(&cmd));
 }
 
-static int admin_read(int argc, char **argv) {
+int admin_read(int argc, char **argv) {
     if (get_tamper_nvs()) {
         ESP_LOGE(TAG, "%s", tamper_msg);
     } else {
@@ -469,7 +547,7 @@ static struct {
     struct arg_end *end;
 } admin_jump_arguments;
 
-static void register_admin_jump() {
+void register_admin_jump() {
     admin_jump_arguments.addr = arg_str1(NULL, NULL, "<address>", "address to jump to (hex)");
     admin_jump_arguments.end = arg_end(1);
     const esp_console_cmd_t cmd = {
@@ -483,7 +561,7 @@ static void register_admin_jump() {
     ESP_ERROR_CHECK(esp_console_cmd_register(&cmd));
 }
 
-static int admin_jump(int argc, char **argv) {
+int admin_jump(int argc, char **argv) {
     if (get_tamper_nvs()) {
         ESP_LOGE(TAG, "%s", tamper_msg);
     } else {
@@ -503,8 +581,8 @@ static int admin_jump(int argc, char **argv) {
 }
 
 // unreferenced function set "used" to store unferenced string data for various challenges
-static __attribute__((used)) int placeholder();
-static int placeholder() {
+__attribute__((used)) int placeholder();
+int placeholder() {
     const char hiddentuna[] = "flag{trawlingTHEDepthsISea}";
     printf(hiddentuna);
     const char ver[] = "COOLTUNA v1.34.5.1.2";

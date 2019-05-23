@@ -4,32 +4,32 @@
 #define HOST "http://192.168.1.215:8080"
 
 // command console registration functions
-static void register_system();
-static void register_factory_reset();
-static void register_restart();
-static int register_tuna_jokes();
-static void register_hidden_cmd();
-static void register_register_team();
-static void register_unread();
-static void register_contacts();
-static void register_read_message();
-static void register_compose();
-static void register_admin_login();
-static void register_admin_read();
-static void register_admin_jump();
+void register_system();
+void register_factory_reset();
+void register_restart();
+int register_tuna_jokes();
+void register_hidden_cmd();
+void register_register_team();
+void register_unread();
+void register_contacts();
+void register_read_message();
+void register_compose();
+void register_admin_login();
+void register_admin_read();
+void register_admin_jump();
 
 // command functions
-static int register_team(int argc, char **argv);
-static int unread(int argc, char **argv);
-static int read_message(int argc, char **argv);
-static int factory_reset(int argc, char **argv);
-static int contacts(int argc, char **argv);
-static int restart(int argc, char** argv);
-static int tuna_jokes(int argc, char **argv);
-static int hidden_cmd(int argc, char **argv); //flag
-static __attribute__((used)) int unregistered_cmd(); //flag
-static int admin_login(int argc, char **argv);
-static int admin_read(int argc, char **argv);
-static int admin_jump(int argc, char **argv);
+int register_team(int argc, char **argv);
+int unread(int argc, char **argv);
+int read_message(int argc, char **argv);
+int factory_reset(int argc, char **argv);
+int contacts(int argc, char **argv);
+int restart(int argc, char** argv);
+int tuna_jokes(int argc, char **argv);
+int hidden_cmd(int argc, char **argv); //flag
+__attribute__((used)) int unregistered_cmd(); //flag
+int admin_login(int argc, char **argv);
+int admin_read(int argc, char **argv);
+int admin_jump(int argc, char **argv);
 
 #endif //THE_INTERCEPT_SHELL_H

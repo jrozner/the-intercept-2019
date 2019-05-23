@@ -29,10 +29,13 @@
 
 #include <driver/adc.h>
 
-#include "wifi.c"
-#include "shell.c"
+#include "wifi.h"
+#include "shell.h"
 #include "common.h"
 #include "tamper.h"
+#include "http.h"
+
+static const char* TAG = "main";
 
 #define PROD false
 
@@ -271,30 +274,9 @@ void app_main() {
     // Join game WIFI network
     //if (!wifi_join("interceptctfnet2","9w38ruaowfuaw86sty3", 10)) {
 
-    nvs_handle nvs;
-    esp_err_t err;
-    ESP_ERROR_CHECK(nvs_open(STORAGE_NAMESPACE, NVS_READWRITE, &nvs));
-
-    size_t serial_length;
-    err = nvs_get_str(nvs, "serial", NULL, &serial_length);
-    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) {
-        ESP_ERROR_CHECK(err);
-    }
-
-    err = nvs_get_str(nvs, "serial", serial, &serial_length);
-    if (err != ESP_OK) {
-        if (err == ESP_ERR_NVS_NOT_FOUND) {
-            for (int i = 0; i < 11; i++) {
-                char c = (esp_random() % 10) + '0';
-                serial[i] = c;
-            }
-            serial[11] = 0;
-            ESP_ERROR_CHECK(nvs_set_str(nvs, "serial", serial));
-            ESP_ERROR_CHECK(nvs_commit(nvs));
-        } else {
-            ESP_ERROR_CHECK(err)
-        }
-    }
+    ESP_ERROR_CHECK(lookup_serial());
+    ESP_ERROR_CHECK(lookup_access_key());
+    ESP_ERROR_CHECK(lookup_secret_key());
 
     /////////////////////////////////////////////////
     // Tamper sensor pin setup

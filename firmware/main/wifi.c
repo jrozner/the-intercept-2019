@@ -8,6 +8,7 @@
 #include "esp_wifi.h"
 #include "tcpip_adapter.h"
 #include "esp_event_loop.h"
+#include "wifi.h"
 
 static EventGroupHandle_t wifi_event_group;
 const int CONNECTED_BIT = BIT0;
@@ -27,7 +28,7 @@ static esp_err_t event_handler(void *ctx, system_event_t *event) {
     return ESP_OK;
 }
 
-static void initialise_wifi(void) {
+void initialise_wifi(void) {
     esp_log_level_set("wifi", ESP_LOG_WARN);
     static bool initialized = false;
     if (initialized) {
@@ -44,7 +45,7 @@ static void initialise_wifi(void) {
     initialized = true;
 }
 
-static bool wifi_join(const char* ssid, const char* pass, int timeout_ms) {
+bool wifi_join(const char* ssid, const char* pass, int timeout_ms) {
     initialise_wifi();
     wifi_config_t wifi_config = { 0 };
     strncpy((char*) wifi_config.sta.ssid, ssid, sizeof(wifi_config.sta.ssid));
