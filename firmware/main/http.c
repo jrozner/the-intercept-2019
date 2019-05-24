@@ -163,7 +163,6 @@ char *generate_auth_header(char *method, char *body) {
     if (asprintf(&header, "AccessKey=%s;Signature=%s", access_key, encoded_signature) == -1) {
         return NULL;
     }
-    printf("header: %s\n", header);
 
     return header;
 }
