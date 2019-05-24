@@ -28,12 +28,14 @@ func Register(w http.ResponseWriter, r *http.Request) {
 
 	teamName := r.FormValue("team_name")
 	if teamName == "" {
+		log.Println("no team specified")
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
 	serial := r.FormValue("serial")
 	if serial == "" {
+		log.Println("no serial specified")
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
