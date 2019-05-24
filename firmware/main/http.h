@@ -10,7 +10,8 @@ int lookup_access_key();
 int set_access_key(char *);
 int lookup_secret_key();
 int set_secret_key(uint8_t *, size_t);
-int generate_signature(unsigned char *, unsigned char *, char *, char *);
+int generate_signature(unsigned char *, char *, char *);
+char *generate_auth_header(char *method, char *body);
 
 
 #endif //THE_INTERCEPT_HTTP_H

@@ -7,6 +7,7 @@
 
 #include "http.h"
 #include "common.h"
+#include "util.h"
 
 char serial[12];
 char *access_key = NULL;
@@ -77,7 +78,10 @@ int set_access_key(char *val) {
     if (access_key != NULL) {
         free(access_key);
     }
-    access_key = val;
+
+    if ((access_key = strdup(val)) == NULL) {
+        return ESP_FAIL;
+    }
 
     return ESP_OK;
 }
@@ -88,7 +92,7 @@ int lookup_secret_key() {
     ESP_ERROR_CHECK(nvs_open(STORAGE_NAMESPACE, NVS_READWRITE, &nvs));
 
     size_t key_length;
-    err = nvs_get_str(nvs, "secret_key", NULL, &key_length);
+    err = nvs_get_blob(nvs, "secret_key", NULL, &key_length);
     if (err != ESP_OK) {
         if (err == ESP_ERR_NVS_NOT_FOUND) {
             return ESP_OK;
@@ -102,7 +106,7 @@ int lookup_secret_key() {
         return ESP_FAIL;
     }
 
-    ESP_ERROR_CHECK(nvs_get_str(nvs, "secret_key", access_key, &key_length));
+    ESP_ERROR_CHECK(nvs_get_blob(nvs, "secret_key", secret_key, &key_length));
 
     nvs_close(nvs);
     return ESP_OK;
@@ -117,15 +121,19 @@ int set_secret_key(uint8_t *val, size_t len) {
     if (secret_key != NULL) {
         free(secret_key);
     }
-    secret_key = val;
+
+    if ((secret_key = malloc(len)) == NULL) {
+        return ESP_FAIL;
+    }
+
+    memcpy(secret_key, val, len);
 
     return ESP_OK;
 }
 
-int generate_signature(unsigned char *out, unsigned char *key, char *method, char *body) {
+int generate_signature(unsigned char *out, char *method, char *body) {
     char *input;
     size_t input_len;
-    //unsigned char hash[crypto_auth_hmacsha256_BYTES];
 
     if (asprintf(&input, "%s%s%s", method, serial, body) == -1) {
         return -1;
@@ -138,3 +146,25 @@ int generate_signature(unsigned char *out, unsigned char *key, char *method, cha
     free(input);
     return 0;
 }
+
+char *generate_auth_header(char *method, char *body) {
+    unsigned char hash[crypto_auth_hmacsha256_BYTES];
+
+    if (generate_signature(hash, method, body) == -1) {
+        return NULL;
+    }
+
+    const size_t encoded_length = (crypto_auth_hmacsha256_BYTES * 2) + 1;
+
+    char encoded_signature[encoded_length];
+    hex_encode(encoded_signature, hash, crypto_auth_hmacsha256_BYTES);
+
+    char *header;
+    if (asprintf(&header, "AccessKey=%s;Signature=%s", access_key, encoded_signature) == -1) {
+        return NULL;
+    }
+    printf("header: %s\n", header);
+
+    return header;
+}
+

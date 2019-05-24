@@ -100,8 +100,8 @@ int register_team(int argc, char **argv) {
     esp_http_client_handle_t client = esp_http_client_init(&config);
 
     esp_http_client_set_method(client, HTTP_METHOD_POST);
-
-    if (esp_http_client_open(client, strlen(post_data)) != ESP_OK) {
+    esp_http_client_set_header(client, "Content-Type", "application/x-www-form-urlencoded");
+    if (esp_http_client_open(client, body_len) != ESP_OK) {
         ESP_LOGE(TAG, "Failed to open HTTP connection");
         free(post_data);
         return ESP_FAIL;
@@ -116,6 +116,9 @@ int register_team(int argc, char **argv) {
 
     int content_length = esp_http_client_fetch_headers(client);
     if (content_length == ESP_FAIL || content_length == 0) {
+        if (esp_http_client_is_chunked_response(client)) {
+            printf("response is chunked\n");
+        }
         ESP_LOGE(TAG, "no length or chunked");
         esp_http_client_cleanup(client);
         free(post_data);
@@ -166,9 +169,9 @@ int register_team(int argc, char **argv) {
         return ESP_FAIL;
     }
 
-    ESP_ERROR_CHECK(set_secret_key(decoded, strlen(sk)/2));
+    size_t secret_length = strlen(sk) / 2;
 
-    ESP_ERROR_CHECK(nvs_commit(nvs));
+    ESP_ERROR_CHECK(set_secret_key(decoded, secret_length));
 
     nvs_close(nvs);
     cJSON_free(root);
@@ -321,10 +324,17 @@ int unread(int argc, char **argv) {
     };
     esp_http_client_handle_t client = esp_http_client_init(&config);
 
+    char *auth_header;
+    if ((auth_header = generate_auth_header("GET", "")) == NULL) {
+        return ESP_FAIL;
+    }
+
+    esp_http_client_set_header(client, "Authorization", auth_header);
     esp_http_client_set_method(client, HTTP_METHOD_GET);
 
     if (esp_http_client_open(client, 0) != ESP_OK) {
         ESP_LOGE(TAG, "Failed to open HTTP connection");
+        free(auth_header);
         return ESP_FAIL;
     }
 
@@ -332,12 +342,14 @@ int unread(int argc, char **argv) {
     if (content_length == ESP_FAIL || content_length == 0) {
         ESP_LOGE(TAG, "no length or chunked");
         esp_http_client_cleanup(client);
+        free(auth_header);
         return ESP_FAIL;
     }
 
     if (esp_http_client_get_status_code(client) != 200) {
         ESP_LOGE(TAG, "did not return a 200 status");
         esp_http_client_cleanup(client);
+        free(auth_header);
         return ESP_FAIL;
     }
 
@@ -345,6 +357,7 @@ int unread(int argc, char **argv) {
     if (buffer == NULL) {
         ESP_LOGE(TAG, "unable to allocate space for buffer");
         esp_http_client_cleanup(client);
+        free(auth_header);
         return ESP_FAIL;
     }
 
@@ -354,24 +367,30 @@ int unread(int argc, char **argv) {
     if (read_len < total_read) {
         esp_http_client_cleanup(client);
         free(buffer);
+        free(auth_header);
         return ESP_FAIL;
     }
 
     nvs_handle nvs;
     ESP_ERROR_CHECK(nvs_open(STORAGE_NAMESPACE, NVS_READWRITE, &nvs));
 
-    printf("Unread Messages:");
+    printf("Unread Messages:\n");
 
     cJSON *messages = cJSON_Parse(buffer), *message;
 
     cJSON_ArrayForEach(message, messages) {
-        char *text = cJSON_GetObjectItem(message,"text")->valuestring;
+        char id = cJSON_GetObjectItem(message, "id")->valueint;
+        char *text = cJSON_GetObjectItem(message, "text")->valuestring;
+        cJSON *sender = cJSON_GetObjectItem(message, "sender");
+        char *sender_name = cJSON_GetObjectItem(sender, "team_name")->valuestring;
+
+        printf("#%d | %s | %s\n", id, sender_name, text);
     }
 
     cJSON_free(messages);
-
-    esp_http_client_cleanup(client);
     free(buffer);
+    esp_http_client_cleanup(client);
+    free(auth_header);
 
     return ESP_OK;
 }

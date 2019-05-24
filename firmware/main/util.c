@@ -5,26 +5,59 @@
 
 #include "util.h"
 
+int hexchr2bin(char hex, uint8_t *out) {
+    if (out == NULL) {
+        return 0;
+    }
+
+    if (hex >= '0' && hex <= '9') {
+        *out = hex - '0';
+    } else if (hex >= 'A' && hex <= 'F') {
+        *out = hex - 'A' + 10;
+    } else if (hex >= 'a' && hex <= 'f') {
+        *out = hex - 'a' + 10;
+    } else {
+        return 0;
+    }
+
+    return 1;
+}
+
 uint8_t *hex_decode(char *in) {
-    size_t input_length = strlen(in);
-
-    if (input_length < 0) {
+    if (in == NULL || *in == '\0') {
         return NULL;
     }
 
-    if ((input_length % 2) != 0) {
+    size_t len = strlen(in);
+    if (len % 2 != 0) {
         return NULL;
     }
 
-    uint8_t *out;
-    if ((out = calloc(input_length / 2, sizeof(uint8_t))) == NULL) {
-        return NULL;
-    }
+    len /= 2;
 
-    int i = 0;
-    for (char *s = in; *s != '\0'; s += 2) {
-        sscanf(s, "%2x", (int *)out+i);
+    uint8_t *out = malloc(len);
+    int i;
+    for (i = 0; i < len; i++) {
+        uint8_t b1, b2;
+        if (!hexchr2bin(in[i*2], &b1) || !hexchr2bin(in[i*2+1], &b2)) {
+            return NULL;
+        }
+
+        out[i] = (b1 << 4) | b2;
     }
 
     return out;
+}
+
+const char hex_bytes[] = "0123456789abcdef";
+
+void hex_encode(char *out, uint8_t *in, size_t len) {
+    int i;
+    for (i = 0; i < len; i++) {
+        uint8_t byte = in[i];
+        out[i * 2] = hex_bytes[byte >> 4];
+        out[i * 2 + 1] = hex_bytes[byte & 0x0f];
+    }
+
+    out[i * 2] = '\0';
 }
