@@ -743,7 +743,7 @@ int compose(int argc, char **argv) {
     esp_http_client_handle_t client = esp_http_client_init(&config);
 
     char *auth_header;
-    if ((auth_header = generate_auth_header("POST", "")) == NULL) {
+    if ((auth_header = generate_auth_header("POST", post_data)) == NULL) {
         return ESP_FAIL;
     }
 
