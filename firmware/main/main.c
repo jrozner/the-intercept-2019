@@ -144,9 +144,6 @@ static void IRAM_ATTR gpio_isr_handler_sw2(void* arg) {
 // debounce vars for digital switches
 bool old_state_sw1=0, old_state_sw2=0;
 
-// has user been notified of tampering detected?
-bool tamper_notified = 0;
-
 // Task handling digital sensor notifications from ISRs
 static void sensor_handler_digi(void *arg) {
     uint32_t io_num;

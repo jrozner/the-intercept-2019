@@ -196,8 +196,105 @@ void register_factory_reset() {
 }
 
 int factory_reset(int argc, char **argv) {
+    char *url = HOST "/rotate_secret";
+
+    esp_http_client_config_t config = {
+            .url = url,
+            .event_handler = _http_event_handle,
+    };
+    esp_http_client_handle_t client = esp_http_client_init(&config);
+
+    char *auth_header;
+    if ((auth_header = generate_auth_header("POST", "")) == NULL) {
+        return ESP_FAIL;
+    }
+
+    esp_http_client_set_header(client, "Authorization", auth_header);
+
+    esp_http_client_set_method(client, HTTP_METHOD_POST);
+    esp_http_client_set_header(client, "Content-Type", "application/x-www-form-urlencoded");
+    if (esp_http_client_open(client, 0) != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to open HTTP connection");
+        free(auth_header);
+        return ESP_FAIL;
+    }
+
+    //if (esp_http_client_write(client, "", 0) <= 0) {
+    //    ESP_LOGE(TAG, "Failed to write post body");
+    //    esp_http_client_cleanup(client);
+    //    return ESP_FAIL;
+    //}
+
+    int content_length = esp_http_client_fetch_headers(client);
+    if (content_length == ESP_FAIL || content_length == 0) {
+        if (esp_http_client_is_chunked_response(client)) {
+            printf("response is chunked\n");
+        }
+        ESP_LOGE(TAG, "no length or chunked");
+        esp_http_client_cleanup(client);
+        free(auth_header);
+        return ESP_FAIL;
+    }
+
+    if (esp_http_client_get_status_code(client) != 200) {
+        ESP_LOGE(TAG, "did not return a 200 status");
+        esp_http_client_cleanup(client);
+        free(auth_header);
+        return ESP_FAIL;
+    }
+
+    char *buffer = malloc(content_length+1);
+    if (buffer == NULL) {
+        ESP_LOGE(TAG, "unable to allocate space for buffer");
+        esp_http_client_cleanup(client);
+        free(auth_header);
+        return ESP_FAIL;
+    }
+
+    int total_read = 0, read_len = 0;
+    read_len = esp_http_client_read(client, buffer, content_length);
+
+    if (read_len < total_read) {
+        esp_http_client_cleanup(client);
+        free(buffer);
+        free(auth_header);
+        return ESP_FAIL;
+    }
+
+    cJSON *root = cJSON_Parse(buffer);
+
+    nvs_handle nvs;
+    ESP_ERROR_CHECK(nvs_open(STORAGE_NAMESPACE, NVS_READWRITE, &nvs));
+
+    char *ak = cJSON_GetObjectItem(root,"access_key")->valuestring;
+    ESP_ERROR_CHECK(set_access_key(ak));
+
+    char *sk = cJSON_GetObjectItem(root,"secret_key")->valuestring;
+    uint8_t *decoded;
+    if ((decoded = hex_decode(sk)) == NULL) {
+        ESP_LOGE(TAG, "Failed to decode secret key");
+        nvs_close(nvs);
+        cJSON_free(root);
+        esp_http_client_cleanup(client);
+        free(auth_header);
+        return ESP_FAIL;
+    }
+
+    size_t secret_length = strlen(sk) / 2;
+
+    ESP_ERROR_CHECK(set_secret_key(decoded, secret_length));
+
+    nvs_close(nvs);
+    cJSON_free(root);
+
     set_tamper_nvs(0);
-// move tamper_notified to tamper.h and reset it here?
+    tamper_notified = false;
+
+    esp_http_client_cleanup(client);
+    free(decoded);
+    free(buffer);
+    free(auth_header);
+
     return ESP_OK;
 }
 

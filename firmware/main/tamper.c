@@ -2,6 +2,8 @@
 #include "tamper.h"
 #include "common.h"
 
+bool tamper_notified = false;
+
 uint8_t get_tamper_nvs(){
     nvs_handle nvs;
     esp_err_t err;
