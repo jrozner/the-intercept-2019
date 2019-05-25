@@ -61,3 +61,15 @@ void hex_encode(char *out, uint8_t *in, size_t len) {
 
     out[i * 2] = '\0';
 }
+
+char *substr(char *s, size_t limit) {
+    char *sub;
+    if ((sub = malloc(limit+1)) == NULL) {
+        return NULL;
+    }
+
+    strncpy(sub, s, limit);
+    sub[limit] = '\0';
+
+    return sub;
+}

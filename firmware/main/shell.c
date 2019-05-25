@@ -568,7 +568,13 @@ int unread(int argc, char **argv) {
         cJSON *sender = cJSON_GetObjectItem(message, "sender");
         char *sender_name = cJSON_GetObjectItem(sender, "team_name")->valuestring;
 
-        printf("#%d | %s | %s\n", id, sender_name, text);
+        char *short_text;
+        if ((short_text = substr(text, 20)) == NULL) {
+            continue;
+        }
+
+        printf("#%d | %s | %s\n", id, sender_name, short_text);
+        free(short_text);
     }
 
     cJSON_free(messages);
