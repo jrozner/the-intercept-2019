@@ -131,7 +131,7 @@ int register_team(int argc, char **argv) {
     }
 
     if (esp_http_client_get_status_code(client) != 200) {
-        ESP_LOGE(TAG, "did not return a 200 status");
+        ESP_LOGE(TAG, "got unexpected status");
         esp_http_client_cleanup(client);
         free(post_data);
         return ESP_FAIL;
@@ -215,7 +215,6 @@ int factory_reset(int argc, char **argv) {
     }
 
     esp_http_client_set_header(client, "Authorization", auth_header);
-
     esp_http_client_set_method(client, HTTP_METHOD_POST);
     esp_http_client_set_header(client, "Content-Type", "application/x-www-form-urlencoded");
     if (esp_http_client_open(client, 0) != ESP_OK) {
@@ -242,7 +241,7 @@ int factory_reset(int argc, char **argv) {
     }
 
     if (esp_http_client_get_status_code(client) != 200) {
-        ESP_LOGE(TAG, "did not return a 200 status");
+        ESP_LOGE(TAG, "got unexpected status");
         esp_http_client_cleanup(client);
         free(auth_header);
         return ESP_FAIL;
@@ -351,7 +350,7 @@ int contacts(int argc, char **argv) {
     }
 
     if (esp_http_client_get_status_code(client) != 200) {
-        ESP_LOGE(TAG, "did not return a 200 status");
+        ESP_LOGE(TAG, "got unexpected status");
         esp_http_client_cleanup(client);
         free(auth_header);
         return ESP_FAIL;
@@ -532,7 +531,7 @@ int unread(int argc, char **argv) {
     }
 
     if (esp_http_client_get_status_code(client) != 200) {
-        ESP_LOGE(TAG, "did not return a 200 status");
+        ESP_LOGE(TAG, "got unexpected status");
         esp_http_client_cleanup(client);
         free(auth_header);
         return ESP_FAIL;
@@ -606,7 +605,7 @@ int read_message(int argc, char **argv) {
     char *url;
 
     if (argc < 2) {
-        printf("missing argument: id\n");
+        ESP_LOGE(TAG, "missing argument");
         return ESP_FAIL;
     }
 
@@ -645,7 +644,7 @@ int read_message(int argc, char **argv) {
     }
 
     if (esp_http_client_get_status_code(client) != 200) {
-        ESP_LOGE(TAG, "did not return a 200 status");
+        ESP_LOGE(TAG, "got unexpected status");
         free(url);
         esp_http_client_cleanup(client);
         free(auth_header);
@@ -718,6 +717,63 @@ int compose(int argc, char **argv) {
         ESP_LOGE(TAG, "%s", tamper_msg);
         return ESP_FAIL;
     }
+
+    char *post_data;
+    char *url = HOST "/messages";
+    size_t body_len;
+
+    if (argc != 3) {
+        ESP_LOGE(TAG, "invalid arguments");
+        return ESP_FAIL;
+    }
+
+    asprintf(&post_data, "receiver=%s&text=%s", argv[1], argv[2]);
+    body_len = strlen(post_data);
+
+    esp_http_client_config_t config = {
+            .url = url,
+            .event_handler = _http_event_handle,
+    };
+    esp_http_client_handle_t client = esp_http_client_init(&config);
+
+    char *auth_header;
+    if ((auth_header = generate_auth_header("POST", "")) == NULL) {
+        return ESP_FAIL;
+    }
+
+    esp_http_client_set_header(client, "Authorization", auth_header);
+    esp_http_client_set_method(client, HTTP_METHOD_POST);
+    esp_http_client_set_header(client, "Content-Type", "application/x-www-form-urlencoded");
+    if (esp_http_client_open(client, body_len) != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to open HTTP connection");
+        free(post_data);
+        return ESP_FAIL;
+    }
+
+    if (esp_http_client_write(client, post_data, body_len) <= 0) {
+        ESP_LOGE(TAG, "Failed to write post body");
+        free(post_data);
+        esp_http_client_cleanup(client);
+        return ESP_FAIL;
+    }
+
+    int content_length = esp_http_client_fetch_headers(client);
+    if (content_length == ESP_FAIL) {
+        ESP_LOGE(TAG, "failed to read headers");
+        esp_http_client_cleanup(client);
+        free(post_data);
+        return ESP_FAIL;
+    }
+
+    if (esp_http_client_get_status_code(client) != 201) {
+        ESP_LOGE(TAG, "got unexpected status");
+        esp_http_client_cleanup(client);
+        free(post_data);
+        return ESP_FAIL;
+    }
+
+    esp_http_client_cleanup(client);
+    free(post_data);
 
     return ESP_OK;
 }
