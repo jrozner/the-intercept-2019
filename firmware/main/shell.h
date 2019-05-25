@@ -1,7 +1,7 @@
 #ifndef THE_INTERCEPT_SHELL_H
 #define THE_INTERCEPT_SHELL_H
 
-#define HOST "http://192.168.1.215:8080"
+#define HOST "http://10.0.0.2:8080"
 
 // command console registration functions
 void register_system();

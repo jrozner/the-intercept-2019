@@ -272,7 +272,7 @@ void app_main() {
     register_system();
 
     // Join game WIFI network
-    //if (!wifi_join("interceptctfnet2","9w38ruaowfuaw86sty3", 10)) {
+    wifi_join("interceptctfnet2", "9w38ruaowfuaw86sty3", 10);
 
     ESP_ERROR_CHECK(lookup_serial());
     ESP_ERROR_CHECK(lookup_access_key());
