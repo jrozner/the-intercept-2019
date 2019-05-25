@@ -79,7 +79,7 @@ func (a *authenticate) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		goto authfail
 	}
 
-	secret, err = hex.DecodeString(user.SecretKey)
+	secret, err = hex.DecodeString(user.SecretKey[0:64])
 	if err != nil {
 		goto autherr
 	}
