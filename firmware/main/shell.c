@@ -86,6 +86,11 @@ void register_register_team() {
 }
 
 int register_team(int argc, char **argv) {
+    if (get_tamper_nvs()) {
+        ESP_LOGE(TAG, "%s", tamper_msg);
+        return ESP_FAIL;
+    }
+
     char *post_data;
     char *url = HOST "/register";
     size_t body_len;
@@ -310,6 +315,11 @@ void register_contacts() {
 }
 
 int contacts(int argc, char **argv) {
+    if (get_tamper_nvs()) {
+        ESP_LOGE(TAG, "%s", tamper_msg);
+        return ESP_FAIL;
+    }
+
     char *url = HOST "/contacts";
 
     esp_http_client_config_t config = {
@@ -412,6 +422,11 @@ int tuna_jokes(int argc, char **argv) {
         "What do you call a tuna with a tie?\n\nSoFISHticated\n",
     };
 
+    if (get_tamper_nvs()) {
+        ESP_LOGE(TAG, "%s", tamper_msg);
+        return ESP_FAIL;
+    }
+
     printf(jokes[xTaskGetTickCount()&7]);
 
     return ESP_OK;
@@ -437,6 +452,12 @@ int hidden_cmd(int argc, char **argv) {
     static char c[] = "ind";
     static char e[] = "FIS";
 
+
+    if (get_tamper_nvs()) {
+        ESP_LOGE(TAG, "%s", tamper_msg);
+        return ESP_FAIL;
+    }
+
     printf("What did the tuna say when he posted bail?\n\n");
     printf("I'm off the hook.\n\n");
     printf("%s%s%sT%s%sH%sZ}\n",a,b,c,d,e,f);
@@ -445,6 +466,10 @@ int hidden_cmd(int argc, char **argv) {
 }
 
 int unregistered_cmd() {
+    if (get_tamper_nvs()) {
+        printf("unable to execute command; tamper detected. Perform a factory reset to continue use");
+        return ESP_FAIL;
+    }
     // unregistered command
     // find by reversing or some magical hax to jump to it
     // flag{hiddenAmongTHEReeds}
@@ -471,6 +496,11 @@ void register_restart() {
 }
 
 int unread(int argc, char **argv) {
+    if (get_tamper_nvs()) {
+        ESP_LOGE(TAG, "%s", tamper_msg);
+        return ESP_FAIL;
+    }
+
     char *url = HOST "/messages";
 
     esp_http_client_config_t config = {
@@ -568,6 +598,11 @@ static struct {
 
 
 int read_message(int argc, char **argv) {
+    if (get_tamper_nvs()) {
+        ESP_LOGE(TAG, "%s", tamper_msg);
+        return ESP_FAIL;
+    }
+
     char *url;
 
     if (argc < 2) {
@@ -679,6 +714,11 @@ static struct {
 
 
 int compose(int argc, char **argv) {
+    if (get_tamper_nvs()) {
+        ESP_LOGE(TAG, "%s", tamper_msg);
+        return ESP_FAIL;
+    }
+
     return ESP_OK;
 }
 
@@ -721,49 +761,51 @@ void register_admin_login() {
 int admin_login(int argc, char **argv) {
     if (get_tamper_nvs()) {
         ESP_LOGE(TAG, "%s", tamper_msg);
-    } else {
-        if (admin_state != 1) { // check if already admin
-            if (argv[1] != NULL) {
-                // do check
-                const char aa[] = "\x60\x6a\x7f\x75\xa3\x4f\x07\xb3\xb2"; // enc 1
-                const char bb[] = "\x53\x7c\x25\xed\x5b\x9d\x95\x06\x17"; // enc 2
-                const char cc[] = "\x2b\x23\x31\x32\xcc\x29\x73\xfb\xd7"; // key 1
-                const char dd[] = "\x1e\x3d\x66\xa6\x1e\xcf\xd0\x4a\x64"; // key 2
-                char ee[20]; // output buf
-                memset(&ee, 0, 20);
-                uint8_t i;
-                for (i=0; i<9; i++) {// reassemble plaintext password
-                    ee[i] = aa[i] ^ cc[i];
-                    ee[i+9] = bb[i] ^ dd[i];
-                }
-
-                const TickType_t delay_ms = 50/portTICK_PERIOD_MS;
-
-                if (strlen(argv[1]) == 18) {
-                    bool allowed = true;
-                    for (i=0; i<18; i++) {
-                        if (ee[i] != argv[1][i]) {
-                            allowed=false;
-                            break;
-                        }
-                        vTaskDelay(delay_ms); // Force delay for timing attack vuln
-                    }
-                    if (allowed) {
-                        admin_state = 1;
-                        register_admin_read();
-                        register_admin_jump();
-                        printf("Access granted.\nHello, Administrator!\nPlease check 'help' for administrative help.\n");
-                        return ESP_OK;
-                    }
-                }
-                printf("Access denied.\n");
-            } else {
-                printf("Please specify a password!\n");
-            }
-        } else {
-            printf("You're already an admin, you silly salmon.\n");
-        }
+        return ESP_FAIL;
     }
+
+    if (admin_state != 1) { // check if already admin
+        if (argv[1] != NULL) {
+            // do check
+            const char aa[] = "\x60\x6a\x7f\x75\xa3\x4f\x07\xb3\xb2"; // enc 1
+            const char bb[] = "\x53\x7c\x25\xed\x5b\x9d\x95\x06\x17"; // enc 2
+            const char cc[] = "\x2b\x23\x31\x32\xcc\x29\x73\xfb\xd7"; // key 1
+            const char dd[] = "\x1e\x3d\x66\xa6\x1e\xcf\xd0\x4a\x64"; // key 2
+            char ee[20]; // output buf
+            memset(&ee, 0, 20);
+            uint8_t i;
+            for (i=0; i<9; i++) {// reassemble plaintext password
+                ee[i] = aa[i] ^ cc[i];
+                ee[i+9] = bb[i] ^ dd[i];
+            }
+
+            const TickType_t delay_ms = 50/portTICK_PERIOD_MS;
+
+            if (strlen(argv[1]) == 18) {
+                bool allowed = true;
+                for (i=0; i<18; i++) {
+                    if (ee[i] != argv[1][i]) {
+                        allowed=false;
+                        break;
+                    }
+                    vTaskDelay(delay_ms); // Force delay for timing attack vuln
+                }
+                if (allowed) {
+                    admin_state = 1;
+                    register_admin_read();
+                    register_admin_jump();
+                    printf("Access granted.\nHello, Administrator!\nPlease check 'help' for administrative help.\n");
+                    return ESP_OK;
+                }
+            }
+            printf("Access denied.\n");
+        } else {
+            printf("Please specify a password!\n");
+        }
+    } else {
+        printf("You're already an admin, you silly salmon.\n");
+    }
+
     return ESP_OK;
 }
 
@@ -789,16 +831,18 @@ void register_admin_read() {
 int admin_read(int argc, char **argv) {
     if (get_tamper_nvs()) {
         ESP_LOGE(TAG, "%s", tamper_msg);
-    } else {
-        if (admin_state) {
-            if (argv[1] != NULL) {
-                unsigned int *addr = strtoul(argv[1], NULL, 16);
-                printf("Reading from %s: %08x\n", argv[1], (unsigned int)(*addr)); 
-            } else {
-                printf("Please specify an address to read from!\n");
-            }
+        return ESP_FAIL;
+    }
+
+    if (admin_state) {
+        if (argv[1] != NULL) {
+            unsigned int *addr = strtoul(argv[1], NULL, 16);
+            printf("Reading from %s: %08x\n", argv[1], (unsigned int)(*addr));
+        } else {
+            printf("Please specify an address to read from!\n");
         }
     }
+
     return ESP_OK;
 }
 
@@ -824,19 +868,21 @@ void register_admin_jump() {
 int admin_jump(int argc, char **argv) {
     if (get_tamper_nvs()) {
         ESP_LOGE(TAG, "%s", tamper_msg);
-    } else {
-        if (admin_state) {
-            if (argv[1] != NULL) {
-                printf("Prepare for dive!\n");
-                int addr = strtoul(argv[1], NULL, 16);
-                int (*func)();
-                func = (int (*)())addr;
-                (int)(*func)();
-            } else {
-                printf("Please specify an address to jump to!\n");
-            }
+        return ESP_FAIL;
+    }
+
+    if (admin_state) {
+        if (argv[1] != NULL) {
+            printf("Prepare for dive!\n");
+            int addr = strtoul(argv[1], NULL, 16);
+            int (*func)();
+            func = (int (*)())addr;
+            (int)(*func)();
+        } else {
+            printf("Please specify an address to jump to!\n");
         }
     }
+
     return ESP_OK;
 }
 
