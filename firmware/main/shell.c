@@ -86,11 +86,6 @@ void register_register_team() {
 }
 
 int register_team(int argc, char **argv) {
-    if (get_tamper_nvs()) {
-        ESP_LOGE(TAG, "%s", tamper_msg);
-        return ESP_FAIL;
-    }
-
     char *post_data;
     char *url = HOST "/register";
     size_t body_len;
