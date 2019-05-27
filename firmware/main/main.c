@@ -37,7 +37,7 @@
 
 static const char* TAG = "main";
 
-#define PROD false
+#define PROD true
 
 // sensor pins
 #define SENSOR_SW1 4 //GPIO 4 - phys 6
