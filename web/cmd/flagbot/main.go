@@ -29,7 +29,7 @@ func main() {
 		db.LogMode(true)
 	}
 
-	c, err := client.NewClient(config.Host, config.AccessKey, config.SecretKey, config.Serial)
+	c, err := client.NewClient(config.Host, config.AccessKey, config.SecretKey[0:64], config.Serial)
 	if err != nil {
 		log.Fatal(err)
 	}
